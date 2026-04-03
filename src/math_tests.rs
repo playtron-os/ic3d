@@ -91,6 +91,42 @@ fn ease_out_back_overshoots() {
 }
 
 #[test]
+fn ease_smooth_endpoints() {
+    assert!((ease_smooth(0.0)).abs() < 1e-6);
+    assert!((ease_smooth(1.0) - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn ease_smooth_midpoint() {
+    assert!((ease_smooth(0.5) - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn ease_smooth_clamps() {
+    assert!((ease_smooth(-1.0)).abs() < 1e-6);
+    assert!((ease_smooth(2.0) - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn ease_out_cubic_endpoints() {
+    assert!((ease_out_cubic(0.0)).abs() < 1e-6);
+    assert!((ease_out_cubic(1.0) - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn ease_out_cubic_fast_start() {
+    // Should be past halfway at t=0.5 (cubic ease-out front-loads motion)
+    let mid = ease_out_cubic(0.5);
+    assert!(mid > 0.5, "expected > 0.5, got {mid}");
+}
+
+#[test]
+fn ease_out_cubic_clamps() {
+    assert!((ease_out_cubic(-1.0)).abs() < 1e-6);
+    assert!((ease_out_cubic(2.0) - 1.0).abs() < 1e-6);
+}
+
+#[test]
 fn hash_f32_in_range() {
     for i in 0..20 {
         let h = hash_f32(i as f32, (i * 7) as f32, 42.0);

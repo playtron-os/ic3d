@@ -51,6 +51,24 @@ pub fn ease_out_back(t: f32) -> f32 {
     1.0 + c3 * x * x * x + c1 * x * x
 }
 
+/// Smooth Hermite interpolation on `[0, 1]` — equivalent to `smoothstep(0, 1, t)`.
+///
+/// Good default easing for animations that need smooth start and end.
+#[must_use]
+pub fn ease_smooth(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Cubic ease-out: fast start, slow finish.
+///
+/// `1 - (1 - t)^3` — decelerates toward the end.
+#[must_use]
+pub fn ease_out_cubic(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    1.0 - (1.0 - t).powi(3)
+}
+
 /// Deterministic spatial hash — stable per-cell randomness from 2D coords + seed.
 ///
 /// Returns a value in `[0, 1)`.
