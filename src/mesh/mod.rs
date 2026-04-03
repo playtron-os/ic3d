@@ -242,6 +242,117 @@ impl MeshBuilder {
         self
     }
 
+    /// Extrude side walls only for a 2D polygon ring.
+    ///
+    /// Creates one quad per edge, connecting the top ring at `z = depth` to
+    /// the bottom ring at `z = 0`. Unlike [`extrude`](Self::extrude), this
+    /// does **not** add a top-face cap — use it when you triangulate the
+    /// top face separately (e.g. with earcut for concave polygons).
+    ///
+    /// ```rust,ignore
+    /// // Triangulate top face externally, then add walls:
+    /// let builder = MeshBuilder::new("shape")
+    ///     .triangle(a, b, c)  // from earcut
+    ///     .extrude_walls(&outline, 0.5);
+    /// ```
+    #[must_use]
+    pub fn extrude_walls(mut self, ring: &[[f32; 2]], depth: f32) -> Self {
+        let n = ring.len();
+        for i in 0..n {
+            let j = (i + 1) % n;
+            self = self.quad(
+                [ring[i][0], ring[i][1], 0.0],
+                [ring[j][0], ring[j][1], 0.0],
+                [ring[j][0], ring[j][1], depth],
+                [ring[i][0], ring[i][1], depth],
+            );
+        }
+        self
+    }
+
+    /// Triangulate a concave 2D polygon and add the top face at `z = depth`.
+    ///
+    /// Uses earcut for robust concave/self-intersecting polygon support.
+    /// Unlike [`extrude`](Self::extrude) (which uses fan triangulation for
+    /// convex shapes only), this works with any simple polygon.
+    ///
+    /// Does **not** add side walls — chain with
+    /// [`extrude_walls`](Self::extrude_walls) for a full extruded shape.
+    ///
+    /// ```rust,ignore
+    /// let mesh = MeshBuilder::new("L-shape")
+    ///     .triangulate(&concave_ring, 0.5)
+    ///     .extrude_walls(&concave_ring, 0.5)
+    ///     .build();
+    /// ```
+    #[allow(clippy::cast_possible_truncation)]
+    #[must_use]
+    pub fn triangulate(mut self, ring: &[[f32; 2]], depth: f32) -> Self {
+        let coords: Vec<f64> = ring
+            .iter()
+            .flat_map(|p| [f64::from(p[0]), f64::from(p[1])])
+            .collect();
+        let indices = earcutr::earcut(&coords, &[], 2).expect("earcut failed");
+        for chunk in indices.chunks(3) {
+            let (i0, i1, i2) = (chunk[0], chunk[1], chunk[2]);
+            self = self.triangle(
+                [coords[i0 * 2] as f32, coords[i0 * 2 + 1] as f32, depth],
+                [coords[i1 * 2] as f32, coords[i1 * 2 + 1] as f32, depth],
+                [coords[i2 * 2] as f32, coords[i2 * 2 + 1] as f32, depth],
+            );
+        }
+        self
+    }
+
+    /// Triangulate a 2D polygon with holes and add the top face at `z = depth`.
+    ///
+    /// `outer` is the outer boundary ring. `holes` is a slice of inner hole
+    /// rings that will be subtracted. Uses earcut for triangulation.
+    ///
+    /// Does **not** add side walls — chain with
+    /// [`extrude_walls`](Self::extrude_walls) for each ring.
+    ///
+    /// ```rust,ignore
+    /// let mesh = MeshBuilder::new("O-shape")
+    ///     .triangulate_with_holes(&outer, &[&inner], 0.1)
+    ///     .extrude_walls(&outer, 0.1)
+    ///     .extrude_walls(&inner, 0.1)
+    ///     .build();
+    /// ```
+    #[allow(clippy::cast_possible_truncation)]
+    #[must_use]
+    pub fn triangulate_with_holes(
+        mut self,
+        outer: &[[f32; 2]],
+        holes: &[&[[f32; 2]]],
+        depth: f32,
+    ) -> Self {
+        let mut coords: Vec<f64> =
+            Vec::with_capacity((outer.len() + holes.iter().map(|h| h.len()).sum::<usize>()) * 2);
+        for pt in outer {
+            coords.push(f64::from(pt[0]));
+            coords.push(f64::from(pt[1]));
+        }
+        let mut hole_indices = Vec::with_capacity(holes.len());
+        for hole in holes {
+            hole_indices.push(coords.len() / 2);
+            for pt in *hole {
+                coords.push(f64::from(pt[0]));
+                coords.push(f64::from(pt[1]));
+            }
+        }
+        let indices = earcutr::earcut(&coords, &hole_indices, 2).expect("earcut with holes failed");
+        for chunk in indices.chunks(3) {
+            let (i0, i1, i2) = (chunk[0], chunk[1], chunk[2]);
+            self = self.triangle(
+                [coords[i0 * 2] as f32, coords[i0 * 2 + 1] as f32, depth],
+                [coords[i1 * 2] as f32, coords[i1 * 2 + 1] as f32, depth],
+                [coords[i2 * 2] as f32, coords[i2 * 2 + 1] as f32, depth],
+            );
+        }
+        self
+    }
+
     /// Consume the builder and produce the final [`Mesh`].
     #[must_use]
     pub fn build(self) -> Mesh {

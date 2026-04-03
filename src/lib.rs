@@ -22,6 +22,7 @@ mod post_process;
 mod scene;
 mod shaders;
 mod shadow;
+pub mod svg;
 mod transform;
 mod utils;
 pub mod widget;

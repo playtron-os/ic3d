@@ -9,6 +9,7 @@ repository = "https://github.com/playtron-os/iced3d"
 [dependencies]
 glam = "0.29"
 bytemuck = { version = "1.14", features = ["derive"] }
+earcutr = "0.4"
 
 [dependencies.iced]
 git = "https://github.com/playtron-os/iced.git"
