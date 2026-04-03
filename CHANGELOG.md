@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/playtron-os/iced3d/compare/v1.0.0...v1.0.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* msaa issue causing error in tests ([c94df9b](https://github.com/playtron-os/iced3d/commit/c94df9b3c483721dd7ef920fa8cbe7e7ebc7922a))
+
 # 1.0.0 (2026-04-03)
 
 
