@@ -1,0 +1,38 @@
+# Semantic Release Configuration
+# https://semantic-release.gitbook.io/semantic-release/usage/configuration
+
+# Any merges into branches that match these patterns will trigger a release.
+branches:
+  - name: main
+
+# These plugins will run when a release is triggered. They will analyze commit
+# messages to determine what kind of release this is and publish a new release.
+plugins:
+  # Analyze commit messages to determine next version
+  - "@semantic-release/commit-analyzer"
+
+  # Generate release notes
+  - "@semantic-release/release-notes-generator"
+
+  # Generate changelog
+  - - "@semantic-release/changelog"
+    - changelogFile: CHANGELOG.md
+
+  # Replace version strings in the project. The 'git' plugin is needed to
+  # commit the version strings to the repository.
+  # Using exec + sed for Cargo.toml to only replace the FIRST version match (package version)
+  # The replace plugin would replace ALL matches including dependency versions
+  - - "@semantic-release/exec"
+    - shell: true
+      prepareCmd: |
+        sed -i '0,/^version = "[0-9]\+\.[0-9]\+\.[0-9]\+"$/s//version = "${nextRelease.version}"/' Cargo.toml
+
+  # Commit the following changes to git after other plugins have run
+  - - "@semantic-release/git"
+    - assets:
+        - CHANGELOG.md
+        - Cargo.toml
+        - Cargo.lock
+
+  # Create a GitHub release
+  - "@semantic-release/github"

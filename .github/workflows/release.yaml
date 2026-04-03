@@ -1,0 +1,33 @@
+name: "🎉 Release"
+
+on:
+  workflow_dispatch:
+    inputs: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Task
+        uses: go-task/setup-task@v1
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - run: |
+          npm install @semantic-release/exec @semantic-release/git @semantic-release/changelog @semantic-release/github
+      - run: |
+          task release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

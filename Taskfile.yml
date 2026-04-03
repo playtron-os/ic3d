@@ -87,6 +87,15 @@ tasks:
     cmds:
       - cargo tarpaulin --features vulkan --skip-clean --config tarpaulin.toml --out html --output-dir coverage
 
+  release:
+    desc: Publish a new release
+    preconditions:
+      - sh: which npx
+        msg: "Prerequisite utility 'npx' is not installed"
+    cmds:
+      # The .releaserc.yaml config contains the build commands and publish config
+      - npx semantic-release
+
   clean:
     desc: Remove build artifacts
     cmds:
