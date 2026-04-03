@@ -91,6 +91,7 @@ cargo doc --no-deps
 - `glam` is re-exported — consumers use `iced3d::glam` instead of a direct dependency
 - Keep files small and modular: one type/concept per file, grouped by folder (camera/, light/)
 - New camera types → new file in `camera/`, new light types → new file in `light/`
+- Tests live in separate `_tests.rs` files, included via `#[cfg(test)] #[path = "foo_tests.rs"] mod tests;`
 
 ## WGSL Alignment (Critical)
 
