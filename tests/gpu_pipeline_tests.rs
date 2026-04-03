@@ -59,12 +59,17 @@ fn set_clear_color() {
     pipeline.set_clear_color(wgpu::Color::BLACK);
 }
 
+/// Use `msaa_samples(1)` in all tests that call `prepare_scene`, `render`, or
+/// `warmup` because lavapipe (Mesa software Vulkan in CI) segfaults on 4× MSAA.
+fn ci_config() -> PipelineConfig<'static> {
+    PipelineConfig::default().msaa_samples(1)
+}
+
 #[test]
 fn prepare_empty_scene() {
     let (device, queue) = gpu_helper::gpu();
     let shader = default_shader();
-    let mut pipeline =
-        RenderPipeline3D::new(&device, output_format(), &shader, PipelineConfig::default());
+    let mut pipeline = RenderPipeline3D::new(&device, output_format(), &shader, ci_config());
 
     let scene = Scene::new(&OrthographicCamera::new()).build();
     pipeline.prepare_scene(&device, &queue, (64, 64), &scene, &[]);
@@ -74,8 +79,7 @@ fn prepare_empty_scene() {
 fn prepare_with_instances() {
     let (device, queue) = gpu_helper::gpu();
     let shader = default_shader();
-    let mut pipeline =
-        RenderPipeline3D::new(&device, output_format(), &shader, PipelineConfig::default());
+    let mut pipeline = RenderPipeline3D::new(&device, output_format(), &shader, ci_config());
 
     let scene = Scene::new(&OrthographicCamera::new()).build();
     let instances: Vec<_> = (0..10)
@@ -88,8 +92,7 @@ fn prepare_with_instances() {
 fn prepare_resize_triggers_msaa_rebuild() {
     let (device, queue) = gpu_helper::gpu();
     let shader = default_shader();
-    let mut pipeline =
-        RenderPipeline3D::new(&device, output_format(), &shader, PipelineConfig::default());
+    let mut pipeline = RenderPipeline3D::new(&device, output_format(), &shader, ci_config());
 
     let scene = Scene::new(&OrthographicCamera::new()).build();
     pipeline.prepare_scene(&device, &queue, (64, 64), &scene, &[]);
@@ -112,8 +115,7 @@ fn draw_builds_draw_call() {
 fn full_render_cycle() {
     let (device, queue) = gpu_helper::gpu();
     let shader = default_shader();
-    let mut pipeline =
-        RenderPipeline3D::new(&device, output_format(), &shader, PipelineConfig::default());
+    let mut pipeline = RenderPipeline3D::new(&device, output_format(), &shader, ci_config());
 
     let scene = Scene::new(&OrthographicCamera::new()).build();
     let instance = Transform::default().to_instance([1.0, 0.5, 0.5, 1.0]);
@@ -156,8 +158,7 @@ fn full_render_cycle() {
 fn warmup_completes() {
     let (device, queue) = gpu_helper::gpu();
     let shader = default_shader();
-    let mut pipeline =
-        RenderPipeline3D::new(&device, output_format(), &shader, PipelineConfig::default());
+    let mut pipeline = RenderPipeline3D::new(&device, output_format(), &shader, ci_config());
 
     let cube = Mesh::cube(1.0).upload(&device);
     pipeline.warmup(&device, &queue, &[cube.buffer()], None);
@@ -168,7 +169,7 @@ fn warmup_with_custom_uniforms() {
     let (device, queue) = gpu_helper::gpu();
     let custom = CustomUniformBuffer::new(&device, 16);
     let shader = default_shader();
-    let config = PipelineConfig::default().custom_bind_group_layout(custom.layout());
+    let config = ci_config().custom_bind_group_layout(custom.layout());
     let mut pipeline = RenderPipeline3D::new(&device, output_format(), &shader, config);
 
     custom.write(&queue, &[0u8; 16]);

@@ -472,14 +472,21 @@ impl RenderPipeline3D {
             target
         };
 
-        // Pass 2: Main render (MSAA → resolved)
+        // Pass 2: Main render (MSAA → resolved, or direct when samples == 1)
         {
+            let use_msaa = self.msaa_samples > 1;
+            let (view, resolve) = if use_msaa {
+                (&self.msaa_color_view, Some(resolve_target))
+            } else {
+                (resolve_target, None)
+            };
+
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("iced3d main pass (MSAA)"),
+                label: Some("iced3d main pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.msaa_color_view,
+                    view,
                     depth_slice: None,
-                    resolve_target: Some(resolve_target),
+                    resolve_target: resolve,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
@@ -597,14 +604,21 @@ impl RenderPipeline3D {
         // Shadow pass — forces shadow pipeline compilation
         self.shadow.render(&mut encoder, &draws);
 
-        // Main MSAA pass — forces main pipeline + fragment shader compilation
+        // Main pass — forces main pipeline + fragment shader compilation
         {
+            let use_msaa = self.msaa_samples > 1;
+            let (view, resolve): (&wgpu::TextureView, Option<&wgpu::TextureView>) = if use_msaa {
+                (&color_view, Some(&resolve_view))
+            } else {
+                (&resolve_view, None)
+            };
+
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("iced3d warmup main pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &color_view,
+                    view,
                     depth_slice: None,
-                    resolve_target: Some(&resolve_view),
+                    resolve_target: resolve,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
