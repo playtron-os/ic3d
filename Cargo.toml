@@ -1,0 +1,34 @@
+[package]
+name = "iced3d"
+version = "0.1.0"
+edition = "2021"
+description = "Lightweight 3D instanced rendering for iced applications"
+license = "GPL-3.0-only"
+repository = "https://github.com/playtron-os/iced3d"
+
+[dependencies]
+glam = "0.29"
+bytemuck = { version = "1.14", features = ["derive"] }
+
+[dependencies.iced]
+git = "https://github.com/playtron-os/iced.git"
+default-features = false
+features = ["wgpu", "x11", "wayland", "tokio"]
+
+[dependencies.wgpu]
+git = "https://github.com/playtron-os/wgpu.git"
+rev = "f28c5f92e"
+default-features = false
+features = ["std", "wgsl"]
+
+[features]
+default = []
+debug = []
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[[example]]
+name = "showcase"
+path = "examples/showcase.rs"
+required-features = ["debug"]
