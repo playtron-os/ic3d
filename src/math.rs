@@ -75,3 +75,7 @@ pub fn hash_f32_signed(x: f32, y: f32, seed: f32) -> f32 {
 pub fn hash_f32_range(x: f32, y: f32, seed: f32, min: f32, max: f32) -> f32 {
     min + hash_f32(x, y, seed) * (max - min)
 }
+
+#[cfg(test)]
+#[path = "math_tests.rs"]
+mod tests;

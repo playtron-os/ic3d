@@ -85,3 +85,7 @@ impl Mesh {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cone_tests.rs"]
+mod tests;

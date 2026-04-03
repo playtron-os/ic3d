@@ -1,0 +1,3 @@
+[iced3d]
+# Measure lib + integration tests (skip doctests and examples)
+run-types = ["Lib", "Tests"]

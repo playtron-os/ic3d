@@ -92,3 +92,7 @@ impl Mesh {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "torus_tests.rs"]
+mod tests;

@@ -87,3 +87,7 @@ impl Default for Transform {
         Self::new()
     }
 }
+
+#[cfg(test)]
+#[path = "transform_tests.rs"]
+mod tests;

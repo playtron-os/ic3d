@@ -24,6 +24,11 @@ features = ["std", "wgsl"]
 [features]
 default = []
 debug = []
+vulkan = ["wgpu/vulkan"]
+
+[dev-dependencies]
+pollster = "0.4"
+bytemuck = "1.14"
 
 [lints.rust]
 unsafe_code = "forbid"

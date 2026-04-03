@@ -68,3 +68,7 @@ impl Light for PointLight {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "point_tests.rs"]
+mod tests;

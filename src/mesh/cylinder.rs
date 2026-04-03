@@ -124,3 +124,7 @@ impl Mesh {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cylinder_tests.rs"]
+mod tests;

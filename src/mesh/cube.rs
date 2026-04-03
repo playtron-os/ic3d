@@ -89,3 +89,7 @@ impl Mesh {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cube_tests.rs"]
+mod tests;

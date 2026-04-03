@@ -85,3 +85,7 @@ impl Camera for PerspectiveCamera {
         Mat4::perspective_rh(self.fov_y, self.aspect, self.near, self.far)
     }
 }
+
+#[cfg(test)]
+#[path = "perspective_tests.rs"]
+mod tests;

@@ -50,3 +50,7 @@ impl Mesh {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "plane_tests.rs"]
+mod tests;

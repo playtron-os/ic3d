@@ -1,5 +1,133 @@
 use super::*;
 
+// ────────────────── Mesh accessors ──────────────────
+
+#[test]
+fn mesh_label() {
+    let mesh = Mesh::cube(1.0);
+    assert!(mesh.label().contains("cube"));
+}
+
+#[test]
+fn mesh_custom() {
+    let v = crate::gpu_types::Vertex {
+        pos: [0.0, 0.0, 0.0],
+        normal: [0.0, 1.0, 0.0],
+        uv: [0.0, 0.0],
+    };
+    let mesh = Mesh::custom(vec![v, v, v], "test");
+    assert_eq!(mesh.vertices().len(), 3);
+    assert_eq!(mesh.label(), "test");
+}
+
+// ────────────────── Mirror Y ──────────────────
+
+#[test]
+fn mirror_y_flips_y() {
+    let mesh = Mesh::plane(1.0, 1.0);
+    let mirrored = mesh.mirror_y();
+    for (orig, mir) in mesh.vertices().iter().zip(mirrored.vertices()) {
+        assert!((orig.pos[1] - (-mir.pos[1])).abs() < 1e-6);
+    }
+}
+
+#[test]
+fn mirror_y_negates_normals() {
+    let mesh = Mesh::plane(1.0, 1.0);
+    let mirrored = mesh.mirror_y();
+    for (orig, mir) in mesh.vertices().iter().zip(mirrored.vertices()) {
+        assert!((orig.normal[0] - (-mir.normal[0])).abs() < 1e-6);
+        assert!((orig.normal[1] - (-mir.normal[1])).abs() < 1e-6);
+        assert!((orig.normal[2] - (-mir.normal[2])).abs() < 1e-6);
+    }
+}
+
+#[test]
+fn mirror_y_preserves_vertex_count() {
+    let mesh = Mesh::cube(1.0);
+    let mirrored = mesh.mirror_y();
+    assert_eq!(mesh.vertices().len(), mirrored.vertices().len());
+}
+
+// ────────────────── MeshBuilder ──────────────────
+
+#[test]
+fn builder_triangle_auto_normal() {
+    let mesh = MeshBuilder::new("test")
+        .triangle([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+        .build();
+    assert_eq!(mesh.vertices().len(), 3);
+    // Auto-normal for this triangle should point in +Z
+    let n = mesh.vertices()[0].normal;
+    assert!(n[2] > 0.0, "expected +Z normal, got {n:?}");
+}
+
+#[test]
+fn builder_triangle_with_normal() {
+    let mesh = MeshBuilder::new("test")
+        .triangle_with_normal(
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, -1.0],
+        )
+        .build();
+    let n = mesh.vertices()[0].normal;
+    assert!((n[2] - (-1.0)).abs() < 1e-6);
+}
+
+#[test]
+fn builder_quad_makes_6_vertices() {
+    let mesh = MeshBuilder::new("test")
+        .quad(
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+        )
+        .build();
+    assert_eq!(mesh.vertices().len(), 6);
+}
+
+#[test]
+fn builder_extrude_pentagon() {
+    let points: Vec<[f32; 2]> = (0..5)
+        .map(|i| {
+            let angle = std::f32::consts::TAU * i as f32 / 5.0;
+            [angle.cos(), angle.sin()]
+        })
+        .collect();
+    let mesh = MeshBuilder::new("pentagon").extrude(&points, 1.0).build();
+    // Should have top face + sides
+    assert!(!mesh.vertices().is_empty());
+    assert_eq!(mesh.vertices().len() % 3, 0);
+}
+
+#[test]
+fn builder_extrude_triangle_shape() {
+    let mesh = MeshBuilder::new("tri")
+        .extrude(&[[0.0, 0.0], [1.0, 0.0], [0.5, 1.0]], 2.0)
+        .build();
+    // Top face: 1 triangle = 3 verts, sides: 3 edges × 2 tris × 3 verts = 18
+    assert_eq!(mesh.vertices().len(), 3 + 18);
+}
+
+#[test]
+fn builder_chaining() {
+    let mesh = MeshBuilder::new("multi")
+        .triangle([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+        .quad(
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+        )
+        .build();
+    assert_eq!(mesh.vertices().len(), 3 + 6);
+}
+
+// ────────────────── Winding correctness ──────────────────
+
 /// Verify that every triangle in every built-in mesh has winding consistent
 /// with its vertex normals. The geometric face normal (edge1 × edge2 via
 /// the right-hand rule) must align with the average vertex normal (positive

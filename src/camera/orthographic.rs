@@ -103,3 +103,7 @@ impl Camera for OrthographicCamera {
         )
     }
 }
+
+#[cfg(test)]
+#[path = "orthographic_tests.rs"]
+mod tests;

@@ -110,3 +110,7 @@ impl<'a> Scene<'a> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "scene_tests.rs"]
+mod tests;

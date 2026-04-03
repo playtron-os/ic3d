@@ -51,3 +51,7 @@ pub fn uniforms(mode: u32) -> Vec<u8> {
     let data: [f32; 4] = [mode as f32, 0.0, 0.0, 0.0];
     data.iter().flat_map(|f| f.to_le_bytes()).collect()
 }
+
+#[cfg(test)]
+#[path = "debug_tests.rs"]
+mod tests;

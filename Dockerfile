@@ -3,6 +3,8 @@ FROM rust:1.92
 RUN apt-get update && apt-get install -y \
     cmake \
     libclang-dev \
+    mesa-vulkan-drivers \
+    vulkan-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Taskfile support

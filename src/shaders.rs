@@ -23,3 +23,7 @@ pub const BLINN_PHONG_WGSL: &str = include_str!("../shaders/blinn_phong.wgsl");
 
 /// Internal shadow depth pass shader. Used by [`ShadowPass`](crate::ShadowPass).
 pub(crate) const SHADOW_WGSL: &str = include_str!("../shaders/shadow_pass.wgsl");
+
+#[cfg(test)]
+#[path = "shaders_tests.rs"]
+mod tests;

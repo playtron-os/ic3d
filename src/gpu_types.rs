@@ -168,3 +168,7 @@ pub struct GpuLight {
     pub outer_cone_cos: f32,
     pub _pad: [f32; 2],
 }
+
+#[cfg(test)]
+#[path = "gpu_types_tests.rs"]
+mod tests;

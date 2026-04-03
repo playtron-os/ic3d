@@ -82,3 +82,7 @@ impl Light for SpotLight {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "spot_tests.rs"]
+mod tests;

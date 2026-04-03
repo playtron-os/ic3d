@@ -232,3 +232,7 @@ impl DynBuffer {
         queue.write_buffer(&self.raw, 0, data);
     }
 }
+
+#[cfg(test)]
+#[path = "buffer_tests.rs"]
+mod tests;

@@ -20,3 +20,7 @@ pub fn compose_shader(fragment_wgsl: &str) -> String {
         SCENE_UNIFORMS_WGSL, VERTEX_IO_WGSL, STANDARD_VS_WGSL, SHADOW_PCF_WGSL, fragment_wgsl,
     )
 }
+
+#[cfg(test)]
+#[path = "utils_tests.rs"]
+mod tests;

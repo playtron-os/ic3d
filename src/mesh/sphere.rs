@@ -104,3 +104,7 @@ impl Mesh {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "sphere_tests.rs"]
+mod tests;

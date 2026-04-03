@@ -107,3 +107,7 @@ impl Light for DirectionalLight {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "directional_tests.rs"]
+mod tests;

@@ -38,11 +38,21 @@ tasks:
       - cargo run --example {{.EXAMPLE}} --features debug
 
   test:all:
-    desc: Run all tests
+    desc: Run all tests (unit + GPU integration)
     aliases:
       - test
     cmds:
-      - cargo test -- --show-output
+      - cargo test --features vulkan -- --show-output
+
+  test:unit:
+    desc: Run unit tests only (no GPU required)
+    cmds:
+      - cargo test --lib -- --show-output
+
+  test:gpu:
+    desc: Run GPU integration tests only (requires Vulkan)
+    cmds:
+      - cargo test --features vulkan --test '*' -- --show-output
 
   test:one:
     desc: Run a single test - E.g. go-task test:one TEST=<test>
@@ -71,6 +81,11 @@ tasks:
       - task: lint
       - task: test
       - task: build
+
+  coverage:
+    desc: "Run tests with coverage report (requires cargo-tarpaulin)"
+    cmds:
+      - cargo tarpaulin --features vulkan --skip-clean --config tarpaulin.toml --out html --output-dir coverage
 
   clean:
     desc: Remove build artifacts
