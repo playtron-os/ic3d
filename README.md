@@ -85,37 +85,6 @@ pipeline.render(encoder, target, bounds, &[
 
 `Mesh::cube`, `Mesh::sphere`, `Mesh::cylinder`, `Mesh::cone`, `Mesh::torus`, `Mesh::plane`, `Mesh::custom`
 
-## Project Structure
-
-```
-iced3d/
-├── shaders/                  # WGSL source files (embedded via include_str!)
-│   ├── scene_uniforms.wgsl   # SceneUniforms + GpuLight structs + group 0 bindings
-│   ├── vertex_io.wgsl        # VertexIn / VertexOut structs
-│   ├── standard_vs.wgsl      # Standard vertex shader
-│   ├── shadow_pcf.wgsl       # 16-tap rotated Poisson disk PCF shadow sampling
-│   ├── shadow_pass.wgsl      # Internal shadow depth pass
-│   └── blinn_phong.wgsl      # Default Blinn-Phong fragment shader
-├── src/
-│   ├── lib.rs                # Public API re-exports
-│   ├── shaders.rs            # WGSL constants (include_str! from shaders/)
-│   ├── pipeline.rs           # RenderPipeline3D: shadow + MSAA + post-process
-│   ├── gpu_types.rs          # Vertex, InstanceData, SceneUniforms, GpuLight
-│   ├── camera/               # Camera trait + OrthographicCamera, PerspectiveCamera
-│   ├── light/                # Light trait + DirectionalLight, PointLight, SpotLight
-│   ├── mesh/                 # Mesh + primitive builders (cube, sphere, cylinder, etc.)
-│   ├── transform.rs          # TRS → model + normal matrices → InstanceData
-│   ├── scene.rs              # Scene builder → SceneData (uniforms + lights)
-│   ├── shadow.rs             # ShadowPass, DrawCall
-│   ├── buffer.rs             # DynBuffer (auto-growing), BufferPool (frame-delayed recycling)
-│   ├── post_process.rs       # PostProcessPass trait
-│   ├── widget.rs             # Scene3DProgram trait + scene_3d() widget
-│   └── utils.rs              # compose_shader() helper
-├── examples/
-│   └── showcase.rs           # Visual demo with debug visualization modes (keys 1-6)
-└── Cargo.toml
-```
-
 ## Example
 
 ```bash

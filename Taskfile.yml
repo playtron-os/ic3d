@@ -1,0 +1,137 @@
+version: "3"
+
+vars:
+  NAME:
+    sh: grep 'name =' Cargo.toml | head -n 1 | cut -d'"' -f2
+  VERSION:
+    sh: grep '^version =' Cargo.toml | cut -d'"' -f2
+  HOST_OS:
+    sh: uname
+  HOST_ARCH:
+    sh: uname -m
+  TARGET_ARCH:
+    sh: "rustc -vV | sed -n 's/host: //p'"
+  ARCH:
+    sh: echo "{{.TARGET_ARCH}}" | cut -d'-' -f1
+  IMAGE_NAME: "{{.NAME}}-builder"
+  IMAGE_TAG:
+    sh: sha256sum Dockerfile | cut -d' ' -f1
+
+tasks:
+  default:
+    aliases:
+      - help
+    cmds:
+      - go-task --list
+
+  build:
+    desc: Build the library
+    cmds:
+      - cargo build --target {{.TARGET_ARCH}}
+
+  example:
+    desc: "Run an example - E.g. go-task example EXAMPLE=showcase"
+    requires:
+      vars:
+        - EXAMPLE
+    cmds:
+      - cargo run --example {{.EXAMPLE}} --features debug
+
+  test:all:
+    desc: Run all tests
+    aliases:
+      - test
+    cmds:
+      - cargo test -- --show-output
+
+  test:one:
+    desc: Run a single test - E.g. go-task test:one TEST=<test>
+    requires:
+      vars:
+        - TEST
+    cmds:
+      - RUST_BACKTRACE=1 cargo test {{.TEST}} -- --exact --show-output --include-ignored
+
+  lint:
+    desc: "Run fmt check + clippy"
+    cmds:
+      - cargo fmt --all -- --check
+      - cargo clippy --all-targets --all-features -- -D warnings
+
+  fmt:
+    desc: "Format all code"
+    aliases:
+      - code:format
+    cmds:
+      - cargo fmt --all
+
+  ci:
+    desc: "Run all CI checks (fmt + clippy + test + build)"
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf target .cache
+
+  docker:build:
+    desc: Build the container image used for the `docker:run` target
+    preconditions:
+      - sh: which docker
+        msg: "Prerequisite utility 'docker' is not installed"
+    status:
+      - docker images | grep {{.IMAGE_NAME}} | grep {{.IMAGE_TAG}}
+    cmds:
+      - docker build -t {{.IMAGE_NAME}}:{{.IMAGE_TAG}} .
+
+  docker:run:
+    desc: Run tasks inside Docker. E.g. go-task docker:run TARGET=ci
+    aliases:
+      - in-docker
+    deps:
+      - docker:build
+    preconditions:
+      - sh: which docker
+        msg: "Prerequisite utility 'docker' is not installed"
+    vars:
+      UID:
+        sh: id -u
+      GID:
+        sh: id -g
+      PWD:
+        sh: pwd
+      SSH_KEY:
+        sh: echo "${SSH_KEY}"
+    requires:
+      vars:
+        - TARGET
+    cmds:
+      - mkdir -p .cache/home
+      # A /etc/passwd entry is required so the correct ~/.ssh path is used
+      - echo -e "build:x:{{.UID}}:{{.GID}}::/home/build:/bin/bash" > .cache/passwd
+      # Use the SSH key from the host
+      - |
+        mkdir -p .cache/.ssh
+        {{ if ne .SSH_KEY "" }}
+          echo "{{.SSH_KEY}}" > .cache/.ssh/id_ed25519
+          chmod 600 .cache/.ssh/id_ed25519
+        {{ else }}
+          cp ~/.ssh/* .cache/.ssh
+        {{ end }}
+      - |
+        docker run --rm \
+          -v "{{.PWD}}:{{.PWD}}" \
+          -v "{{.PWD}}/.cache/home:/home/build" \
+          -v "{{.PWD}}/.cache/.ssh:/home/build/.ssh" \
+          -v "{{.PWD}}/.cache/passwd:/etc/passwd" \
+          --workdir "{{.PWD}}" \
+          -e HOME=/home/build \
+          -e CARGO_HOME=/home/build/.cargo \
+          -e CARGO_NET_GIT_FETCH_WITH_CLI=true \
+          -e GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+          --user {{.UID}}:{{.GID}} \
+          {{.IMAGE_NAME}}:{{.IMAGE_TAG}} \
+          task {{.TARGET}} ARCH={{.ARCH}} TARGET_ARCH={{.TARGET_ARCH}}

@@ -49,8 +49,7 @@ fn all_meshes_have_correct_winding() {
                 e1[0] * e2[1] - e1[1] * e2[0],
             ];
 
-            let cross_len_sq =
-                cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
+            let cross_len_sq = cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
             if cross_len_sq < 1e-12 {
                 continue; // degenerate triangle (e.g. sphere pole)
             }
@@ -62,8 +61,7 @@ fn all_meshes_have_correct_winding() {
                 (v0.normal[2] + v1.normal[2] + v2.normal[2]) / 3.0,
             ];
 
-            let dot =
-                cross[0] * avg_n[0] + cross[1] * avg_n[1] + cross[2] * avg_n[2];
+            let dot = cross[0] * avg_n[0] + cross[1] * avg_n[1] + cross[2] * avg_n[2];
 
             assert!(
                 dot > 0.0,

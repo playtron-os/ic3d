@@ -66,10 +66,24 @@ One concept per file, grouped by folder (e.g., `camera/`, `light/`). When adding
 | `blinn_phong.wgsl` | `BLINN_PHONG_WGSL` | Default fragment shader: Blinn-Phong + Fresnel + tone mapping |
 | `shadow_pass.wgsl` | `SHADOW_WGSL` (internal) | Shadow depth pass shader |
 
-## Build
+## Build & Validate
 
 ```bash
+# Using go-task (recommended)
+go-task build            # Build the library
+go-task lint             # fmt check + clippy
+go-task fmt              # Format all code
+go-task test             # Run all tests
+go-task ci               # Full CI pipeline (fmt + clippy + test + build)
+
+# Docker builds (for CI)
+go-task docker:build     # Build the CI container image
+go-task docker:run TARGET=ci  # Run full CI checks in Docker
+
+# Using cargo directly
 cargo build
+cargo test
+cargo clippy --all-targets --all-features
 cargo doc --no-deps
 ```
 

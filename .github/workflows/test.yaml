@@ -1,0 +1,27 @@
+name: 🪲 Test
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Task
+        uses: go-task/setup-task@v1
+      - uses: actions/checkout@v3
+      - run: |
+          task docker:run TARGET='ci'
+        env:
+          SSH_KEY: ${{ secrets.BITBUCKET_SSH_KEY }}
