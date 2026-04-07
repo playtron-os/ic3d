@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/playtron-os/ic3d/compare/v1.0.1...v1.1.0) (2026-04-07)
+
+
+### Features
+
+* rename to ic3d ([f8da935](https://github.com/playtron-os/ic3d/commit/f8da935b02647f95e51317217eb51eba0b82f32a))
+
 ## [1.0.1](https://github.com/playtron-os/iced3d/compare/v1.0.0...v1.0.1) (2026-04-03)
 
 
