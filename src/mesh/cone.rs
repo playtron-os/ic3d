@@ -81,7 +81,7 @@ impl Mesh {
 
         Self {
             vertices: verts,
-            label: "iced3d cone".into(),
+            label: "ic3d cone".into(),
         }
     }
 }

@@ -2,7 +2,7 @@
 //!
 //! All GPU integration tests use this helper. Requires the `vulkan` feature.
 
-use iced3d::wgpu;
+use ic3d::wgpu;
 
 /// Request a wgpu device and queue without a surface (headless).
 ///
@@ -22,7 +22,7 @@ pub fn try_gpu() -> Option<(wgpu::Device, wgpu::Queue)> {
     .ok()?;
 
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        label: Some("iced3d test device"),
+        label: Some("ic3d test device"),
         ..Default::default()
     }))
     .ok()?;

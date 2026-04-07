@@ -21,7 +21,7 @@ impl ShadowPass {
     pub fn new(device: &wgpu::Device, light_buffer: &wgpu::Buffer, size: u32) -> Self {
         // Shadow map depth texture
         let shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("iced3d shadow map"),
+            label: Some("ic3d shadow map"),
             size: wgpu::Extent3d {
                 width: size,
                 height: size,
@@ -42,7 +42,7 @@ impl ShadowPass {
 
         // Comparison sampler for PCF
         let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("iced3d shadow sampler"),
+            label: Some("ic3d shadow sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
@@ -53,7 +53,7 @@ impl ShadowPass {
 
         // Bind group: light storage buffer (vertex stage only)
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("iced3d shadow bind group layout"),
+            label: Some("ic3d shadow bind group layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX,
@@ -67,7 +67,7 @@ impl ShadowPass {
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("iced3d shadow bind group"),
+            label: Some("ic3d shadow bind group"),
             layout: &bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -77,20 +77,20 @@ impl ShadowPass {
 
         // Pipeline layout
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("iced3d shadow pipeline layout"),
+            label: Some("ic3d shadow pipeline layout"),
             bind_group_layouts: &[&bind_group_layout],
             immediate_size: 0,
         });
 
         // Shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("iced3d shadow shader"),
+            label: Some("ic3d shadow shader"),
             source: wgpu::ShaderSource::Wgsl(crate::shaders::SHADOW_WGSL.into()),
         });
 
         // Depth-only pipeline
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("iced3d shadow pipeline"),
+            label: Some("ic3d shadow pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -140,7 +140,7 @@ impl ShadowPass {
     /// Record the shadow depth pass.
     pub fn render(&self, encoder: &mut wgpu::CommandEncoder, draws: &[DrawCall<'_>]) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("iced3d shadow pass"),
+            label: Some("ic3d shadow pass"),
             color_attachments: &[],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &self.depth_view,

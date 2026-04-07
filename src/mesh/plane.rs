@@ -46,7 +46,7 @@ impl Mesh {
         ];
         Self {
             vertices,
-            label: "iced3d plane".into(),
+            label: "ic3d plane".into(),
         }
     }
 }

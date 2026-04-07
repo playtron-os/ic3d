@@ -1,4 +1,4 @@
-// iced3d: 16-tap rotated Poisson disk PCF shadow sampling.
+// ic3d: 16-tap rotated Poisson disk PCF shadow sampling.
 //
 // Uses a screen-space rotation to break up aliasing patterns,
 // similar to Unity's soft shadow implementation.

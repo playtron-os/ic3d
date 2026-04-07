@@ -1,4 +1,4 @@
-// iced3d: Vertex input (matches Vertex + InstanceData layouts)
+// ic3d: Vertex input (matches Vertex + InstanceData layouts)
 struct VertexIn {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -16,7 +16,7 @@ struct VertexIn {
     @location(10) material: vec4<f32>,
 }
 
-// iced3d: Standard vertex output
+// ic3d: Standard vertex output
 struct VertexOut {
     @builtin(position) clip_pos: vec4<f32>,
     @location(0) world_pos: vec3<f32>,

@@ -88,7 +88,7 @@ impl Mesh {
 
         Self {
             vertices: verts,
-            label: "iced3d torus".into(),
+            label: "ic3d torus".into(),
         }
     }
 }

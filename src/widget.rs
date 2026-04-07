@@ -8,8 +8,8 @@
 //! # Simple scene (built-in Blinn-Phong, no shader needed)
 //!
 //! ```rust,ignore
-//! use iced3d::widget::{Scene3DProgram, Scene3DSetup, MeshDrawGroup};
-//! use iced3d::{Mesh, Scene, PerspectiveCamera, DirectionalLight, Transform};
+//! use ic3d::widget::{Scene3DProgram, Scene3DSetup, MeshDrawGroup};
+//! use ic3d::{Mesh, Scene, PerspectiveCamera, DirectionalLight, Transform};
 //!
 //! #[derive(Debug)]
 //! struct MyScene;
@@ -30,7 +30,7 @@
 //! }
 //!
 //! // In your view:
-//! iced3d::widget::scene_3d(MyScene)
+//! ic3d::widget::scene_3d(MyScene)
 //!     .width(Length::Fill)
 //!     .height(Length::Fill)
 //! ```
@@ -136,7 +136,7 @@ pub struct Scene3DSetup {
 /// - No custom uniforms
 ///
 /// All pipeline creation, GPU buffer management, shader composition,
-/// `Primitive`/`Pipeline` trait implementations are handled by iced3d.
+/// `Primitive`/`Pipeline` trait implementations are handled by ic3d.
 pub trait Scene3DProgram: fmt::Debug {
     /// Return the WGSL fragment shader source.
     ///
@@ -315,24 +315,24 @@ impl shader::Pipeline for Scene3DPipeline {
     fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Self {
         let shader_src = SHADER_SOURCE
             .lock()
-            .expect("iced3d: shader source lock")
+            .expect("ic3d: shader source lock")
             .take()
             .unwrap_or_default();
         let custom_size = CUSTOM_UNIFORM_SIZE
             .lock()
-            .expect("iced3d: custom uniform size lock")
+            .expect("ic3d: custom uniform size lock")
             .take()
             .unwrap_or(0);
         let warmup_meshes = WARMUP_MESHES
             .lock()
-            .expect("iced3d: warmup meshes lock")
+            .expect("ic3d: warmup meshes lock")
             .take()
             .unwrap_or_default();
 
         // Build custom bind group layout + buffer + bind group when custom uniforms are used.
         let (custom_uniform_buffer, custom_bind_group, custom_layout) = if custom_size > 0 {
             let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("iced3d custom uniform layout"),
+                label: Some("ic3d custom uniform layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -346,14 +346,14 @@ impl shader::Pipeline for Scene3DPipeline {
             });
 
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("iced3d custom uniform buffer"),
+                label: Some("ic3d custom uniform buffer"),
                 size: custom_size as u64,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
 
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("iced3d custom bind group"),
+                label: Some("ic3d custom bind group"),
                 layout: &layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
@@ -369,7 +369,7 @@ impl shader::Pipeline for Scene3DPipeline {
         // Build pipeline config, injecting the custom layout if present.
         let mut config = PIPELINE_CONFIG
             .lock()
-            .expect("iced3d: pipeline config lock")
+            .expect("ic3d: pipeline config lock")
             .take()
             .unwrap_or_default();
         if let Some(ref layout) = custom_layout {
@@ -381,7 +381,7 @@ impl shader::Pipeline for Scene3DPipeline {
         // Register post-process passes if a factory was provided.
         if let Some(factory) = POST_PROCESS_FACTORY
             .lock()
-            .expect("iced3d: post process lock")
+            .expect("ic3d: post process lock")
             .take()
         {
             for pass in factory(device, queue) {
@@ -421,7 +421,7 @@ static POST_PROCESS_FACTORY: Mutex<Option<PostProcessFactory>> = Mutex::new(None
 /// This is the main entry point. Implement [`Scene3DProgram`] and pass it here.
 ///
 /// ```rust,ignore
-/// iced3d::widget::scene_3d(MyScene)
+/// ic3d::widget::scene_3d(MyScene)
 ///     .width(Length::Fill)
 ///     .height(Length::Fill)
 /// ```
@@ -430,14 +430,12 @@ pub fn scene_3d<Message: 'static>(
     program: impl Scene3DProgram + 'static,
 ) -> iced::widget::Shader<Message, Scene3DWidget> {
     // Stash data for Pipeline::new() to pick up.
-    *SHADER_SOURCE.lock().expect("iced3d: shader source lock") =
+    *SHADER_SOURCE.lock().expect("ic3d: shader source lock") =
         Some(compose_shader(program.fragment_shader()));
-    *PIPELINE_CONFIG
-        .lock()
-        .expect("iced3d: pipeline config lock") = Some(program.pipeline_config());
+    *PIPELINE_CONFIG.lock().expect("ic3d: pipeline config lock") = Some(program.pipeline_config());
     *CUSTOM_UNIFORM_SIZE
         .lock()
-        .expect("iced3d: custom uniform size lock") = {
+        .expect("ic3d: custom uniform size lock") = {
         let size = program.custom_uniforms_size();
         if size > 0 {
             Some(size)
@@ -447,7 +445,7 @@ pub fn scene_3d<Message: 'static>(
     };
 
     let warmup = program.warmup_meshes();
-    *WARMUP_MESHES.lock().expect("iced3d: warmup meshes lock") = if warmup.is_empty() {
+    *WARMUP_MESHES.lock().expect("ic3d: warmup meshes lock") = if warmup.is_empty() {
         None
     } else {
         Some(warmup)
@@ -456,7 +454,7 @@ pub fn scene_3d<Message: 'static>(
     // Stash post-process factory if the program provides one.
     *POST_PROCESS_FACTORY
         .lock()
-        .expect("iced3d: post process lock") = program.post_process_factory();
+        .expect("ic3d: post process lock") = program.post_process_factory();
 
     iced::widget::Shader::new(Scene3DWidget {
         program: Box::new(program),

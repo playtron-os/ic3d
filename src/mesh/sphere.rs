@@ -100,7 +100,7 @@ impl Mesh {
 
         Self {
             vertices: verts,
-            label: "iced3d sphere".into(),
+            label: "ic3d sphere".into(),
         }
     }
 }

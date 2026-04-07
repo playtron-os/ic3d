@@ -3,7 +3,7 @@
 #[path = "gpu_helper.rs"]
 mod gpu_helper;
 
-use iced3d::CustomUniformBuffer;
+use ic3d::CustomUniformBuffer;
 
 #[test]
 fn creation() {

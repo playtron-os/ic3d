@@ -1,4 +1,4 @@
-//! iced3d showcase — demonstrates the Scene3DProgram widget API.
+//! ic3d showcase — demonstrates the Scene3DProgram widget API.
 //!
 //! Renders all built-in mesh primitives arranged on a ground plane with
 //! directional, point, and spot lights. Objects cast soft shadows onto
@@ -8,17 +8,17 @@
 //! cargo run --example showcase
 //! ```
 
+use ic3d::glam::{Quat, Vec3};
+use ic3d::widget::{scene_3d, MeshDrawGroup, Scene3DProgram, Scene3DSetup};
+use ic3d::{DirectionalLight, Mesh, PerspectiveCamera, PointLight, Scene, SpotLight, Transform};
 use iced::keyboard;
 use iced::widget::{column, container, text};
 use iced::{Element, Length, Subscription, Theme};
-use iced3d::glam::{Quat, Vec3};
-use iced3d::widget::{scene_3d, MeshDrawGroup, Scene3DProgram, Scene3DSetup};
-use iced3d::{DirectionalLight, Mesh, PerspectiveCamera, PointLight, Scene, SpotLight, Transform};
 use std::time::Instant;
 
 fn main() -> iced::Result {
     iced::application(App::new, App::update, App::view)
-        .title("iced3d showcase")
+        .title("ic3d showcase")
         .subscription(App::subscription)
         .theme(App::theme)
         .run()
@@ -117,7 +117,7 @@ impl Default for App {
     }
 }
 
-use iced3d::debug;
+use ic3d::debug;
 
 // ─────────────── Scene3DProgram implementation ───────────────
 

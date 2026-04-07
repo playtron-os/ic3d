@@ -1,4 +1,4 @@
-// iced3d: Standard Blinn-Phong fragment shader with multi-light support.
+// ic3d: Standard Blinn-Phong fragment shader with multi-light support.
 //
 // Used as the default fragment shader when Scene3DProgram::fragment_shader()
 // is not overridden. Supports directional, point, and spot lights with

@@ -3,8 +3,8 @@
 #[path = "gpu_helper.rs"]
 mod gpu_helper;
 
-use iced3d::wgpu;
-use iced3d::{
+use ic3d::wgpu;
+use ic3d::{
     compose_shader, CustomUniformBuffer, Mesh, OrthographicCamera, PipelineConfig,
     RenderPipeline3D, Scene, Transform, BLINN_PHONG_WGSL,
 };

@@ -53,7 +53,7 @@ impl<'a> Scene<'a> {
     pub fn light(mut self, light: &dyn Light) -> Self {
         assert!(
             self.light_count < MAX_LIGHTS,
-            "iced3d: exceeded MAX_LIGHTS ({MAX_LIGHTS})"
+            "ic3d: exceeded MAX_LIGHTS ({MAX_LIGHTS})"
         );
         self.lights[self.light_count] = light.to_gpu_light();
         self.light_count += 1;

@@ -868,6 +868,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
+name = "ic3d"
+version = "1.0.0"
+dependencies = [
+ "bytemuck",
+ "earcutr",
+ "glam 0.29.3",
+ "iced",
+ "pollster",
+ "wgpu",
+]
+
+[[package]]
 name = "iced"
 version = "0.15.0-dev"
 source = "git+https://github.com/playtron-os/iced.git#323030eddbe58d2f425c83a6cf2d9cba7083825f"
@@ -880,18 +892,6 @@ dependencies = [
  "iced_widget",
  "iced_winit",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "iced3d"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "earcutr",
- "glam 0.29.3",
- "iced",
- "pollster",
- "wgpu",
 ]
 
 [[package]]

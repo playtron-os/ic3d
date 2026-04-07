@@ -17,7 +17,7 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use iced3d::debug;
+//! use ic3d::debug;
 //!
 //! impl Scene3DProgram for MyScene {
 //!     fn fragment_shader(&self) -> &str { debug::FRAGMENT_WGSL }

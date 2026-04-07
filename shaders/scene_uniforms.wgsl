@@ -1,4 +1,4 @@
-// iced3d: Scene uniforms + light array (group 0)
+// ic3d: Scene uniforms + light array (group 0)
 
 struct SceneUniforms {
     view_projection: mat4x4<f32>,

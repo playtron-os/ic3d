@@ -3,8 +3,8 @@
 #[path = "gpu_helper.rs"]
 mod gpu_helper;
 
-use iced3d::wgpu;
-use iced3d::{GpuLight, ShadowPass, MAX_LIGHTS};
+use ic3d::wgpu;
+use ic3d::{GpuLight, ShadowPass, MAX_LIGHTS};
 
 #[test]
 fn creation() {

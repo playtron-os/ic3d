@@ -95,7 +95,7 @@ impl RenderPipeline3D {
         let msaa_samples = config.msaa_samples.max(1);
 
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("iced3d scene uniforms"),
+            label: Some("ic3d scene uniforms"),
             size: std::mem::size_of::<SceneUniforms>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -104,7 +104,7 @@ impl RenderPipeline3D {
         // Light storage buffer (fixed max size, zero-initialized)
         let light_buffer_size = (std::mem::size_of::<GpuLight>() * MAX_LIGHTS) as u64;
         let light_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("iced3d lights"),
+            label: Some("ic3d lights"),
             size: light_buffer_size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: true,
@@ -115,7 +115,7 @@ impl RenderPipeline3D {
 
         let instance_buffer = DynBuffer::new(
             device,
-            "iced3d instances",
+            "ic3d instances",
             std::mem::size_of::<InstanceData>() as u64 * 512,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
@@ -129,7 +129,7 @@ impl RenderPipeline3D {
         // Scene bind group layout (group 0): uniforms + lights + shadow map + sampler
         let main_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("iced3d scene bind group layout"),
+                label: Some("ic3d scene bind group layout"),
                 entries: &[
                     // binding 0: SceneUniforms (uniform buffer)
                     wgpu::BindGroupLayoutEntry {
@@ -192,18 +192,18 @@ impl RenderPipeline3D {
             };
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("iced3d main pipeline layout"),
+            label: Some("ic3d main pipeline layout"),
             bind_group_layouts: &bind_group_layouts,
             immediate_size: 0,
         });
 
         let main_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("iced3d main shader"),
+            label: Some("ic3d main shader"),
             source: wgpu::ShaderSource::Wgsl(main_shader_wgsl.into()),
         });
 
         let main_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("iced3d main pipeline"),
+            label: Some("ic3d main pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &main_shader,
@@ -289,7 +289,7 @@ impl RenderPipeline3D {
         shadow_sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("iced3d main bind group"),
+            label: Some("ic3d main bind group"),
             layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -399,7 +399,7 @@ impl RenderPipeline3D {
 
         // Resize post-process ping-pong textures if needed
         if !self.post_process_passes.is_empty() && self.pp_size != target_size {
-            let labels = ["iced3d post-process A", "iced3d post-process B"];
+            let labels = ["ic3d post-process A", "ic3d post-process B"];
             for (i, label) in labels.iter().enumerate() {
                 let tex = device.create_texture(&wgpu::TextureDescriptor {
                     label: Some(label),
@@ -467,7 +467,7 @@ impl RenderPipeline3D {
         let resolve_target = if has_post {
             self.pp_views[0]
                 .as_ref()
-                .expect("iced3d: post-process textures not prepared")
+                .expect("ic3d: post-process textures not prepared")
         } else {
             target
         };
@@ -482,7 +482,7 @@ impl RenderPipeline3D {
             };
 
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("iced3d main pass"),
+                label: Some("ic3d main pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     depth_slice: None,
@@ -558,7 +558,7 @@ impl RenderPipeline3D {
             self.msaa_samples,
         );
         let resolve_tex = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("iced3d warmup resolve"),
+            label: Some("ic3d warmup resolve"),
             size: wgpu::Extent3d {
                 width: warmup_size,
                 height: warmup_size,
@@ -581,7 +581,7 @@ impl RenderPipeline3D {
         queue.write_buffer(&self.light_buffer, 0, bytemuck::bytes_of(&dummy_light));
 
         let dummy_instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("iced3d warmup instance"),
+            label: Some("ic3d warmup instance"),
             contents: bytemuck::bytes_of(&dummy_instance),
             usage: wgpu::BufferUsages::VERTEX,
         });
@@ -598,7 +598,7 @@ impl RenderPipeline3D {
             .collect();
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("iced3d warmup encoder"),
+            label: Some("ic3d warmup encoder"),
         });
 
         // Shadow pass — forces shadow pipeline compilation
@@ -614,7 +614,7 @@ impl RenderPipeline3D {
             };
 
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("iced3d warmup main pass"),
+                label: Some("ic3d warmup main pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     depth_slice: None,
@@ -676,7 +676,7 @@ fn create_msaa_textures(
     };
 
     let color_tex = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("iced3d MSAA color"),
+        label: Some("ic3d MSAA color"),
         size: extent,
         mip_level_count: 1,
         sample_count,
@@ -687,7 +687,7 @@ fn create_msaa_textures(
     });
 
     let depth_tex = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("iced3d MSAA depth"),
+        label: Some("ic3d MSAA depth"),
         size: extent,
         mip_level_count: 1,
         sample_count,

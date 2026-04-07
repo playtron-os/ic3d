@@ -1,4 +1,4 @@
-// iced3d: Standard vertex shader
+// ic3d: Standard vertex shader
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     let model = mat4x4<f32>(in.model_0, in.model_1, in.model_2, in.model_3);

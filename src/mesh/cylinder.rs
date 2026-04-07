@@ -120,7 +120,7 @@ impl Mesh {
 
         Self {
             vertices: verts,
-            label: "iced3d cylinder".into(),
+            label: "ic3d cylinder".into(),
         }
     }
 }

@@ -1,4 +1,4 @@
-// iced3d: Debug-capable Blinn-Phong fragment shader.
+// ic3d: Debug-capable Blinn-Phong fragment shader.
 //
 // Extends the standard Blinn-Phong with visualization modes
 // controlled via a custom uniform at @group(1) @binding(0).

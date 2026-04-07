@@ -1,4 +1,4 @@
-# iced3d
+# ic3d
 
 ## Project Overview
 
@@ -90,9 +90,9 @@ cargo doc --no-deps
 
 ## Dependencies
 
-- **iced** — Playtron fork (`github.com/playtron-os/iced.git`), re-exported as `iced3d::iced`
-- **wgpu** — Playtron fork (`github.com/playtron-os/wgpu.git`), re-exported as `iced3d::wgpu`
-- **glam** 0.29 — Math (re-exported as `iced3d::glam`)
+- **iced** — Playtron fork (`github.com/playtron-os/iced.git`), re-exported as `ic3d::iced`
+- **wgpu** — Playtron fork (`github.com/playtron-os/wgpu.git`), re-exported as `ic3d::wgpu`
+- **glam** 0.29 — Math (re-exported as `ic3d::glam`)
 - **bytemuck** 1.14 — Zero-copy GPU uploads
 
 ## Conventions
@@ -103,7 +103,7 @@ cargo doc --no-deps
 - All struct fields private with accessors — do not expose internal GPU buffers or state
 - WGSL lives in `shaders/*.wgsl`, embedded via `include_str!`
 - Rust types and WGSL structs must stay in sync (byte-for-byte)
-- `glam` is re-exported — consumers use `iced3d::glam` instead of a direct dependency
+- `glam` is re-exported — consumers use `ic3d::glam` instead of a direct dependency
 - Keep files small and modular: one type/concept per file, grouped by folder (camera/, light/)
 - New camera types → new file in `camera/`, new light types → new file in `light/`
 - Tests live in separate `_tests.rs` files, included via `#[cfg(test)] #[path = "foo_tests.rs"] mod tests;`
@@ -163,7 +163,7 @@ When adding uniform structs, verify Rust `size_of` matches WGSL. Mismatches caus
 
 ```rust
 // Compose shader — preludes are auto-prepended
-let shader = iced3d::compose_shader(include_str!("my_fragment.wgsl"));
+let shader = ic3d::compose_shader(include_str!("my_fragment.wgsl"));
 let pipeline = RenderPipeline3D::new(device, format, &shader, config);
 ```
 
@@ -213,7 +213,7 @@ Call `pipeline.warmup()` after creation to avoid NVIDIA deferred shader compilat
 For most consumers, the `widget` module provides the simplest path — implement `Scene3DProgram` and call `scene_3d()`. Only `setup()` is required; the built-in Blinn-Phong shader handles lighting automatically:
 
 ```rust
-use iced3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
+use ic3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
 
 #[derive(Debug)]
 struct MyScene { time: f32 }

@@ -1,4 +1,4 @@
-// iced3d shadow pass: depth-only render from primary light's perspective.
+// ic3d shadow pass: depth-only render from primary light's perspective.
 
 struct GpuLight {
     shadow_projection: mat4x4<f32>,

@@ -1,10 +1,10 @@
 [package]
-name = "iced3d"
+name = "ic3d"
 version = "1.0.1"
 edition = "2021"
 description = "Lightweight 3D instanced rendering for iced applications"
 license = "GPL-3.0-only"
-repository = "https://github.com/playtron-os/iced3d"
+repository = "https://github.com/playtron-os/ic3d"
 
 [dependencies]
 glam = "0.29"

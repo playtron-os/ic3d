@@ -4,7 +4,7 @@
 //! Cubic Béziers are flattened to line segments via [`crate::math::flatten_cubic`].
 //!
 //! ```rust,ignore
-//! use iced3d::svg::parse_path;
+//! use ic3d::svg::parse_path;
 //!
 //! let ring = parse_path("M0 0 L10 0 L10 10 L0 10 Z", 8);
 //! assert_eq!(ring.len(), 4);

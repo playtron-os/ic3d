@@ -1,17 +1,17 @@
-# iced3d
+# ic3d
 
 Lightweight 3D instanced rendering for [iced](https://iced.rs) applications. Shadow mapping, configurable MSAA, camera/light/mesh abstractions, and reusable WGSL shader preludes. Consumers write only a fragment shader.
 
-![iced3d showcase](docs/example.png)
+![ic3d showcase](docs/example.png)
 
 ## Quick Start (Widget API)
 
 The simplest path — implement `Scene3DProgram` and call `scene_3d()`. The built-in Blinn-Phong shader handles lighting automatically:
 
 ```rust
-use iced3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
-use iced3d::{Scene, PerspectiveCamera, DirectionalLight, Mesh, Transform};
-use iced3d::glam::Vec3;
+use ic3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
+use ic3d::{Scene, PerspectiveCamera, DirectionalLight, Mesh, Transform};
+use ic3d::glam::Vec3;
 
 #[derive(Debug)]
 struct MyScene { time: f32 }
@@ -45,7 +45,7 @@ Override `fragment_shader()` to replace the default Blinn-Phong, `custom_uniform
 For full control, use `compose_shader()` + `RenderPipeline3D` directly:
 
 ```rust
-let shader = iced3d::compose_shader(include_str!("my_fragment.wgsl"));
+let shader = ic3d::compose_shader(include_str!("my_fragment.wgsl"));
 let pipeline = RenderPipeline3D::new(device, format, &shader, PipelineConfig::default());
 
 // Per frame:
@@ -104,9 +104,9 @@ Renders all built-in primitives on a ground plane with directional, point, and s
 
 ## Dependencies
 
-- **iced** — Playtron fork (GUI framework, re-exported as `iced3d::iced`)
-- **wgpu** — Playtron fork (GPU access, re-exported as `iced3d::wgpu`)
-- **glam** 0.29 — Math (re-exported as `iced3d::glam`)
+- **iced** — Playtron fork (GUI framework, re-exported as `ic3d::iced`)
+- **wgpu** — Playtron fork (GPU access, re-exported as `ic3d::wgpu`)
+- **glam** 0.29 — Math (re-exported as `ic3d::glam`)
 - **bytemuck** 1.14 — Zero-copy GPU uploads
 
 ## Build

@@ -22,7 +22,7 @@ impl CustomUniformBuffer {
     /// Create a new custom uniform buffer of `size` bytes.
     pub fn new(device: &wgpu::Device, size: usize) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("iced3d custom uniform layout"),
+            label: Some("ic3d custom uniform layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -36,14 +36,14 @@ impl CustomUniformBuffer {
         });
 
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("iced3d custom uniform buffer"),
+            label: Some("ic3d custom uniform buffer"),
             size: size as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("iced3d custom bind group"),
+            label: Some("ic3d custom bind group"),
             layout: &layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,

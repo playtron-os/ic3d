@@ -3,8 +3,8 @@
 #[path = "gpu_helper.rs"]
 mod gpu_helper;
 
-use iced3d::wgpu;
-use iced3d::{BufferPool, DynBuffer};
+use ic3d::wgpu;
+use ic3d::{BufferPool, DynBuffer};
 
 #[test]
 fn dyn_buffer_creation() {
