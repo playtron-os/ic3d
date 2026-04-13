@@ -36,21 +36,26 @@
 //! }
 //! ```
 
+mod handler;
 mod input;
+mod rotate;
+mod translate;
 mod types;
 
 #[cfg(test)]
-use input::world_to_screen;
+use crate::math::world_to_screen;
+#[cfg(test)]
+use rotate::RING_MESH_RADIUS;
 pub use types::{GizmoAxis, GizmoMode, GizmoResult};
 
 use crate::camera::CameraInfo;
-use crate::mesh::Mesh;
+use crate::math::HitShape;
 use crate::overlay::base::Overlay;
 use crate::scene::context::SceneContext;
 use crate::scene::object::SceneObjectId;
-use crate::scene::transform::Transform;
 use crate::widget::MeshDrawGroup;
-use glam::{Vec2, Vec3};
+use glam::Vec3;
+use handler::{GizmoHandler, MeshGizmo};
 
 /// Screen-space hit threshold in pixels for axis hover detection.
 const HIT_THRESHOLD_PX: f32 = 20.0;
@@ -58,22 +63,11 @@ const HIT_THRESHOLD_PX: f32 = 20.0;
 /// Default on-screen gizmo size.
 const DEFAULT_GIZMO_SIZE: f32 = 80.0;
 
-/// Internal drag state tracked across frames.
-#[derive(Debug, Clone, Copy)]
-struct DragState {
-    axis: GizmoAxis,
-    /// Last cursor position in screen pixels — delta is computed from this.
-    last_cursor: Vec2,
-    /// Screen-space direction of the axis (unit vector), captured at drag start.
-    screen_axis_dir: Vec2,
-    /// World-space units per screen pixel along the axis, captured at drag start.
-    world_per_px: f32,
-}
-
 /// A 3D manipulation gizmo.
 ///
-/// Renders translation arrows along X/Y/Z and handles mouse interaction.
-/// Feed it cursor position and mouse-button state each frame via [`update`](Self::update).
+/// Renders translation arrows or rotation rings along X/Y/Z and handles
+/// mouse interaction. Feed it cursor position and mouse-button state each
+/// frame via [`update`](Self::update).
 ///
 /// Implements [`Overlay`] — place it in
 /// [`Scene3DSetup::overlays`](crate::widget::Scene3DSetup::overlays) as
@@ -84,7 +78,7 @@ struct DragState {
 /// object automatically — no manual `set_position()` needed.
 #[derive(Debug, Clone)]
 pub struct Gizmo {
-    mode: GizmoMode,
+    handler: GizmoHandler,
     position: Vec3,
     /// Visual scale of the gizmo handles (world units).
     scale: f32,
@@ -98,7 +92,7 @@ pub struct Gizmo {
     /// position from [`SceneHandle`](crate::SceneHandle) each frame.
     attached_to: Option<SceneObjectId>,
     hovered: Option<GizmoAxis>,
-    drag: Option<DragState>,
+    center_hovered: bool,
 }
 
 impl Gizmo {
@@ -106,7 +100,7 @@ impl Gizmo {
     #[must_use]
     pub fn new(mode: GizmoMode) -> Self {
         Self {
-            mode,
+            handler: GizmoHandler::from_mode(mode),
             position: Vec3::ZERO,
             scale: 1.0,
             gizmo_size: DEFAULT_GIZMO_SIZE,
@@ -114,7 +108,7 @@ impl Gizmo {
             interactive: true,
             attached_to: None,
             hovered: None,
-            drag: None,
+            center_hovered: false,
         }
     }
 
@@ -233,7 +227,16 @@ impl Gizmo {
     /// Current gizmo mode.
     #[must_use]
     pub fn mode(&self) -> GizmoMode {
-        self.mode
+        self.handler.mode()
+    }
+
+    /// Change the gizmo mode at runtime.
+    ///
+    /// Clears any active drag or hover state.
+    pub fn set_mode(&mut self, mode: GizmoMode) {
+        self.handler = GizmoHandler::from_mode(mode);
+        self.hovered = None;
+        self.center_hovered = false;
     }
 
     /// Current world-space position.
@@ -248,10 +251,16 @@ impl Gizmo {
         self.hovered
     }
 
+    /// Whether any part of the gizmo is hovered (axis or center).
+    #[must_use]
+    pub fn is_hovered(&self) -> bool {
+        self.hovered.is_some() || self.center_hovered
+    }
+
     /// Whether the gizmo is actively being dragged.
     #[must_use]
     pub fn is_dragging(&self) -> bool {
-        self.drag.is_some()
+        self.handler.is_dragging()
     }
 
     // ──────────── Scale computation ────────────
@@ -339,29 +348,7 @@ impl Gizmo {
     /// position comes from the scene context rather than `self.position`.
     #[must_use]
     fn draw_groups_at(&self, position: Vec3, scale: f32) -> Vec<MeshDrawGroup> {
-        // Unit-size mesh — GPU buffer can be cached across frames.
-        let arrow = Mesh::arrow(1.0);
-
-        GizmoAxis::ALL
-            .iter()
-            .map(|&axis| {
-                let color =
-                    if self.drag.is_some_and(|d| d.axis == axis) || self.hovered == Some(axis) {
-                        axis.highlight_color()
-                    } else {
-                        axis.color()
-                    };
-
-                // Scale applied via transform → instance data (re-uploaded every frame).
-                let instance = Transform::new()
-                    .position(position)
-                    .rotation(axis.rotation())
-                    .uniform_scale(scale)
-                    .to_instance(color);
-
-                MeshDrawGroup::new(arrow.clone(), vec![instance])
-            })
-            .collect()
+        self.handler.draw_simple(position, scale, self.hovered)
     }
 }
 
@@ -380,14 +367,29 @@ impl Overlay for Gizmo {
         self.interactive
     }
 
-    fn draw(&self, ctx: &SceneContext) -> Vec<MeshDrawGroup> {
-        // Resolve effective position: attached object or self.position.
+    fn hit_shapes(&self, ctx: &SceneContext) -> Vec<HitShape> {
         let position = self
             .attached_to
             .and_then(|id| ctx.object_position(id))
             .unwrap_or(self.position);
         let scale = self.compute_scale_at(&ctx.camera, ctx.viewport_size.y, position);
-        self.draw_groups_at(position, scale)
+        self.build_hit_shapes(position, scale, &ctx.camera, ctx.viewport_size)
+    }
+
+    fn draw(&self, ctx: &SceneContext) -> Vec<MeshDrawGroup> {
+        let position = self
+            .attached_to
+            .and_then(|id| ctx.object_position(id))
+            .unwrap_or(self.position);
+        let scale = self.compute_scale_at(&ctx.camera, ctx.viewport_size.y, position);
+        self.handler.draw_at(
+            position,
+            scale,
+            self.hovered,
+            self.center_hovered,
+            &ctx.camera,
+            ctx.viewport_size,
+        )
     }
 }
 

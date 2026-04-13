@@ -7,6 +7,8 @@ use glam::{Quat, Vec3};
 pub enum GizmoMode {
     /// Move the object along axes.
     Translate,
+    /// Rotate the object around axes.
+    Rotate,
 }
 
 /// An axis that can be hovered or dragged.
@@ -66,8 +68,33 @@ impl GizmoAxis {
         }
     }
 
+    /// Two perpendicular vectors spanning the plane of the rotation ring
+    /// for this axis (tangent, bitangent).
+    #[must_use]
+    pub(crate) fn ring_plane(self) -> (Vec3, Vec3) {
+        match self {
+            Self::X => (Vec3::Y, Vec3::Z),
+            Self::Y => (Vec3::X, Vec3::Z),
+            Self::Z => (Vec3::X, Vec3::Y),
+        }
+    }
+
     /// All three axes.
     pub(crate) const ALL: [Self; 3] = [Self::X, Self::Y, Self::Z];
+}
+
+/// Engine-resolved hit on a gizmo shape.
+///
+/// Produced by [`screen_hit_test_closest`](crate::math::screen_hit_test_closest)
+/// over the shapes returned by [`Overlay::hit_shapes`](crate::Overlay::hit_shapes).
+/// Passed to [`Gizmo::update_with_hit`](crate::gizmo::Gizmo) so the gizmo
+/// skips redundant hit testing.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum GizmoHit {
+    /// An axis handle was hit (segment for translate, arc for rotate).
+    Axis(GizmoAxis, f32),
+    /// The center area was hit (rotate mode free-rotate zone).
+    Center,
 }
 
 /// Result of a gizmo interaction for the current frame.
@@ -75,8 +102,16 @@ impl GizmoAxis {
 pub enum GizmoResult {
     /// The cursor is hovering over an axis handle (no drag).
     Hover(GizmoAxis),
+    /// The cursor is hovering over the center area (free-rotate zone).
+    HoverCenter,
     /// The cursor moved off the gizmo after previously hovering.
     Unhover,
     /// A translation drag produced a world-space delta this frame.
     Translate(Vec3),
+    /// A rotation drag produced a world-space rotation delta (radians) this
+    /// frame. Only the component along the dragged axis is non-zero.
+    Rotate(Vec3),
+    /// A free rotation drag produced a world-space quaternion delta this frame.
+    /// Applies trackball-style rotation from mouse movement.
+    FreeRotate(Quat),
 }

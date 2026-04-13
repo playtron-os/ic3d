@@ -11,6 +11,13 @@ use crate::scene::object::SceneObjectId;
 use iced::widget::shader;
 use iced::{mouse, Rectangle};
 
+/// Tracks what the gizmo cursor was hovering last frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HoverState {
+    Axis(SceneObjectId, GizmoAxis),
+    Center(SceneObjectId),
+}
+
 /// Widget-internal state for cursor and mouse tracking.
 ///
 /// Created automatically by iced via `Default`. Tracks the mouse button
@@ -19,7 +26,7 @@ use iced::{mouse, Rectangle};
 pub(crate) struct Scene3DState {
     mouse_pressed: bool,
     /// Last hover state to avoid re-publishing identical hover messages.
-    last_hover: Option<(SceneObjectId, GizmoAxis)>,
+    last_hover: Option<HoverState>,
 }
 
 /// The iced `Program` wrapper. Not constructed directly — use [`scene_3d()`](super::scene_3d).
@@ -92,7 +99,10 @@ impl<Message: 'static> shader::Program<Message> for Scene3DWidget<Message> {
         let cursor_pos = match cursor_pos {
             Some(pos) => pos,
             None => {
-                return if let Some((prev_id, _)) = state.last_hover.take() {
+                return if let Some(prev) = state.last_hover.take() {
+                    let prev_id = match prev {
+                        HoverState::Axis(id, _) | HoverState::Center(id) => id,
+                    };
                     let msg = on_gizmo(prev_id, GizmoResult::Unhover);
                     Some(shader::Action::publish(msg))
                 } else {
@@ -106,7 +116,10 @@ impl<Message: 'static> shader::Program<Message> for Scene3DWidget<Message> {
         let (id, result) = match gizmo_result {
             Some(pair) => pair,
             None => {
-                return if let Some((prev_id, _)) = state.last_hover.take() {
+                return if let Some(prev) = state.last_hover.take() {
+                    let prev_id = match prev {
+                        HoverState::Axis(id, _) | HoverState::Center(id) => id,
+                    };
                     let msg = on_gizmo(prev_id, GizmoResult::Unhover);
                     Some(shader::Action::publish(msg))
                 } else {
@@ -117,14 +130,23 @@ impl<Message: 'static> shader::Program<Message> for Scene3DWidget<Message> {
 
         // Capture events during drag to prevent other widgets from interfering.
         match result {
-            GizmoResult::Translate(_) => {
+            GizmoResult::Translate(_) | GizmoResult::Rotate(_) | GizmoResult::FreeRotate(_) => {
                 state.last_hover = None;
                 let msg = on_gizmo(id, result);
                 Some(shader::Action::publish(msg).and_capture())
             }
             GizmoResult::Hover(axis) => {
                 // Only publish if the hovered axis actually changed.
-                let current = (id, axis);
+                let current = HoverState::Axis(id, axis);
+                if state.last_hover == Some(current) {
+                    return None;
+                }
+                state.last_hover = Some(current);
+                let msg = on_gizmo(id, result);
+                Some(shader::Action::publish(msg))
+            }
+            GizmoResult::HoverCenter => {
+                let current = HoverState::Center(id);
                 if state.last_hover == Some(current) {
                     return None;
                 }

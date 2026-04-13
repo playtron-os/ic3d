@@ -1,6 +1,6 @@
 //! Screen-space projection and hit-testing utilities.
 
-use glam::{Mat4, Vec2, Vec3};
+use glam::{Mat4, Quat, Vec2, Vec3};
 
 use super::ray::Ray;
 
@@ -107,6 +107,57 @@ pub fn screen_constant_scale(
     screen_px * px_world
 }
 
+/// Project a world-space radius to screen-space pixels at a given position.
+///
+/// Computes the screen-pixel length of `world_radius` at `position` by
+/// sampling a point on the silhouette edge perpendicular to the camera's
+/// forward direction and measuring the screen-space distance.
+///
+/// Returns `None` if the center or edge point is behind the camera.
+///
+/// - `position`: world-space center of the radius
+/// - `world_radius`: radius in world units
+/// - `camera`: camera metadata (position, forward, FOV)
+/// - `viewport`: viewport size in logical pixels `(width, height)`
+///
+/// ```rust
+/// use ic3d::math::world_radius_to_screen;
+/// use ic3d::CameraInfo;
+/// use ic3d::glam::{Mat4, Vec2, Vec3};
+///
+/// let view = Mat4::look_at_rh(
+///     Vec3::new(0.0, 0.0, 10.0), Vec3::ZERO, Vec3::Y,
+/// );
+/// let proj = Mat4::perspective_rh(std::f32::consts::FRAC_PI_4, 1.0, 0.1, 100.0);
+/// let camera = CameraInfo {
+///     position: Vec3::new(0.0, 0.0, 10.0),
+///     forward: Vec3::NEG_Z,
+///     fov_y: Some(std::f32::consts::FRAC_PI_4),
+///     view_projection: proj * view,
+/// };
+/// let px = world_radius_to_screen(
+///     Vec3::ZERO, 1.0, &camera, Vec2::new(800.0, 600.0),
+/// ).unwrap();
+/// assert!(px > 0.0);
+/// ```
+#[must_use]
+pub fn world_radius_to_screen(
+    position: Vec3,
+    world_radius: f32,
+    camera: &crate::CameraInfo,
+    viewport: Vec2,
+) -> Option<f32> {
+    let vp = camera.view_projection;
+    let center_screen = world_to_screen(position, vp, viewport)?;
+
+    // Compute an edge point on the silhouette disc perpendicular to the camera.
+    let view_rot = super::rotation::view_facing_rotation(camera.forward);
+    let edge_point = position + view_rot * Vec3::new(world_radius, 0.0, 0.0);
+    let edge_screen = world_to_screen(edge_point, vp, viewport)?;
+
+    Some((edge_screen - center_screen).length())
+}
+
 /// A hittable shape in world space for screen-space hit testing.
 ///
 /// Combine with [`screen_hit_test`] to check if a cursor is within
@@ -128,6 +179,14 @@ pub fn screen_constant_scale(
 /// if let Some(dist) = screen_hit_test(&shape, cursor, view_proj, viewport) {
 ///     // cursor is within 20px of the projected segment
 /// }
+///
+/// // Arc hit (e.g. rotation ring):
+/// let shape = HitShape::arc(
+///     center, radius, rotation, start_angle, sweep, 24, 20.0,
+/// );
+/// if let Some(dist) = screen_hit_test(&shape, cursor, view_proj, viewport) {
+///     // cursor is within 20px of the projected arc polyline
+/// }
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub enum HitShape {
@@ -144,6 +203,27 @@ pub enum HitShape {
         start: Vec3,
         /// Segment end in world space.
         end: Vec3,
+        /// Hit threshold in screen pixels.
+        threshold_px: f32,
+    },
+    /// A world-space circular arc, tested as a projected polyline.
+    ///
+    /// The arc lies in the local XZ plane (Y-up normal) and is transformed
+    /// to world space by `rotation`. The polyline is sampled at `segments`
+    /// intervals and each projected segment is tested against the cursor.
+    Arc {
+        /// World-space center of the arc.
+        center: Vec3,
+        /// Arc radius in world units.
+        radius: f32,
+        /// Local-to-world rotation for the arc plane.
+        rotation: Quat,
+        /// Start angle in radians (in local XZ space).
+        start_angle: f32,
+        /// Sweep angle in radians.
+        sweep: f32,
+        /// Number of polyline segments to sample.
+        segments: u32,
         /// Hit threshold in screen pixels.
         threshold_px: f32,
     },
@@ -165,6 +245,31 @@ impl HitShape {
         Self::Segment {
             start,
             end,
+            threshold_px,
+        }
+    }
+
+    /// Create an arc hit shape.
+    ///
+    /// The arc lies in the local XZ plane and is rotated to world space
+    /// by `rotation`. It is sampled as a polyline with `segments` intervals.
+    #[must_use]
+    pub fn arc(
+        center: Vec3,
+        radius: f32,
+        rotation: Quat,
+        start_angle: f32,
+        sweep: f32,
+        segments: u32,
+        threshold_px: f32,
+    ) -> Self {
+        Self::Arc {
+            center,
+            radius,
+            rotation,
+            start_angle,
+            sweep,
+            segments: segments.max(1),
             threshold_px,
         }
     }
@@ -207,7 +312,70 @@ pub fn screen_hit_test(
             let dist = point_to_segment_distance(cursor, s, e);
             (dist < threshold_px).then_some(dist)
         }
+        HitShape::Arc {
+            center,
+            radius,
+            rotation,
+            start_angle,
+            sweep,
+            segments,
+            threshold_px,
+        } => {
+            let mut min_dist = f32::MAX;
+            for i in 0..segments {
+                let a0 = start_angle + sweep * i as f32 / segments as f32;
+                let a1 = start_angle + sweep * (i + 1) as f32 / segments as f32;
+                let p0 = center + rotation * Vec3::new(a0.cos(), 0.0, a0.sin()) * radius;
+                let p1 = center + rotation * Vec3::new(a1.cos(), 0.0, a1.sin()) * radius;
+                if let (Some(s0), Some(s1)) = (
+                    world_to_screen(p0, view_proj, viewport),
+                    world_to_screen(p1, view_proj, viewport),
+                ) {
+                    min_dist = min_dist.min(point_to_segment_distance(cursor, s0, s1));
+                }
+            }
+            (min_dist < threshold_px).then_some(min_dist)
+        }
     }
+}
+
+/// Find the closest hit among multiple labeled shapes.
+///
+/// Tests each `(label, shape)` pair against the cursor and returns the
+/// label and distance of the closest hit, or `None` if nothing was hit.
+///
+/// This eliminates the common "iterate shapes, keep best" boilerplate:
+///
+/// ```rust,ignore
+/// use ic3d::math::{HitShape, screen_hit_test_closest};
+///
+/// let shapes = [
+///     ("x", HitShape::segment(pos, pos + Vec3::X, 20.0)),
+///     ("y", HitShape::segment(pos, pos + Vec3::Y, 20.0)),
+/// ];
+/// if let Some((axis, dist)) = screen_hit_test_closest(shapes, cursor, vp, viewport) {
+///     println!("Hit {axis} at {dist}px");
+/// }
+/// ```
+#[must_use]
+pub fn screen_hit_test_closest<I, T>(
+    shapes: I,
+    cursor: Vec2,
+    view_proj: Mat4,
+    viewport: Vec2,
+) -> Option<(T, f32)>
+where
+    I: IntoIterator<Item = (T, HitShape)>,
+{
+    let mut best: Option<(T, f32)> = None;
+    for (label, shape) in shapes {
+        if let Some(dist) = screen_hit_test(&shape, cursor, view_proj, viewport) {
+            if best.as_ref().is_none_or(|(_, d)| dist < *d) {
+                best = Some((label, dist));
+            }
+        }
+    }
+    best
 }
 
 /// Unproject a screen-space cursor position onto the XZ ground plane (Y = `height`).

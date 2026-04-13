@@ -273,8 +273,8 @@ impl RenderPipeline3D {
             source: wgpu::ShaderSource::Wgsl(overlay_shader_src.into()),
         });
 
-        // Overlay pipeline layout: group 0 only (scene uniforms) — no custom bind group.
-        // The flat-color shader does not sample shadows or need group 1.
+        // Overlay pipeline layout: group 0 only (scene uniforms + lights) — no custom bind group.
+        // The lit overlay shader reads lights but does not sample shadows or need group 1.
         let overlay_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("ic3d overlay pipeline layout"),
@@ -294,7 +294,7 @@ impl RenderPipeline3D {
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None,
                 ..Default::default()
             },
             depth_stencil: Some(wgpu::DepthStencilState {

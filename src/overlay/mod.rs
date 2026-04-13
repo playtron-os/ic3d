@@ -2,3 +2,4 @@
 
 pub mod base;
 pub mod draggable;
+pub mod interactive;

@@ -21,6 +21,7 @@ pub mod hash;
 pub mod hex_grid;
 pub mod interp;
 pub mod ray;
+pub mod rotation;
 pub mod screen;
 
 pub use curve::*;
@@ -29,4 +30,5 @@ pub use easing::*;
 pub use hash::*;
 pub use hex_grid::*;
 pub use interp::*;
+pub use rotation::*;
 pub use screen::*;

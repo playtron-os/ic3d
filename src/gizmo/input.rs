@@ -1,11 +1,15 @@
 //! Gizmo input handling: cursor tracking, hit testing, and drag interaction.
+//!
+//! Contains the high-level input methods on [`Gizmo`] that delegate
+//! mode-specific work to the [`MeshGizmo`](super::handler::MeshGizmo) handler.
 
 use crate::camera::CameraInfo;
-use crate::math::{screen_hit_test, HitShape};
-use crate::scene::context::{SceneContext, SceneHandle};
+use crate::math::{screen_hit_test_closest, HitShape};
+use crate::scene::context::SceneHandle;
 
-use super::types::{GizmoAxis, GizmoMode, GizmoResult};
-use super::{DragState, Gizmo, HIT_THRESHOLD_PX};
+use super::handler::MeshGizmo;
+use super::types::{GizmoAxis, GizmoHit, GizmoResult};
+use super::Gizmo;
 use glam::Vec2;
 
 impl Gizmo {
@@ -40,139 +44,137 @@ impl Gizmo {
             }
         }
 
-        self.update_with_camera(cursor_pos, mouse_pressed, &camera, viewport_size)
+        let scale = self.compute_scale(&camera, viewport_size.y);
+        self.scale = scale;
+
+        // Engine-side hit testing: build shapes, test closest, pass to update.
+        let hit = if !self.handler.is_dragging() {
+            let shapes = self.build_hit_shapes(self.position, scale, &camera, viewport_size);
+            screen_hit_test_closest(
+                shapes.into_iter().enumerate(),
+                cursor_pos,
+                camera.view_projection,
+                viewport_size,
+            )
+            .map(|(idx, dist)| self.interpret_hit(idx, dist))
+        } else {
+            None
+        };
+
+        self.update_with_hit(cursor_pos, mouse_pressed, &camera, viewport_size, hit)
     }
 
-    /// Process cursor input with explicit camera/viewport data.
+    /// Build hit shapes for this gizmo at the given position and scale.
     ///
-    /// This is the low-level input handler used internally by the widget
-    /// and by [`update`](Self::update). Call this when you have camera
-    /// metadata already available (avoiding the [`SceneHandle`] lookup).
+    /// Delegates to the mode-specific handler.
+    pub(crate) fn build_hit_shapes(
+        &self,
+        position: glam::Vec3,
+        scale: f32,
+        camera: &CameraInfo,
+        viewport_size: Vec2,
+    ) -> Vec<HitShape> {
+        self.handler
+            .build_hit_shapes(position, scale, camera, viewport_size)
+    }
+
+    /// Map a shape index from [`build_hit_shapes`] to a [`GizmoHit`].
+    pub(crate) fn interpret_hit(&self, index: usize, dist: f32) -> GizmoHit {
+        self.handler.interpret_hit(index, dist)
+    }
+
+    /// Process cursor input with a pre-computed hit from engine-side testing.
     ///
-    /// Does **not** sync position from attached objects — call
-    /// [`set_position`](Self::set_position) first if needed.
-    pub(crate) fn update_with_camera(
+    /// Called by [`SceneHandle::process_gizmo`](crate::SceneHandle) after
+    /// testing [`hit_shapes`](crate::Overlay::hit_shapes) via
+    /// [`screen_hit_test_closest`](crate::math::screen_hit_test_closest).
+    /// The engine passes the winning shape as a [`GizmoHit`], eliminating
+    /// the need for the gizmo to re-test internally.
+    ///
+    /// During an active drag, `hit` is ignored — the gizmo continues
+    /// tracking the cursor without hit testing.
+    pub(crate) fn update_with_hit(
         &mut self,
         cursor_pos: Vec2,
         mouse_pressed: bool,
         camera: &CameraInfo,
         viewport_size: Vec2,
+        hit: Option<GizmoHit>,
     ) -> Option<GizmoResult> {
-        // Auto-compute scale for hit testing from camera metadata.
         let scale = self.compute_scale(camera, viewport_size.y);
         self.scale = scale;
 
-        match self.mode {
-            GizmoMode::Translate => {
-                self.update_translate(mouse_pressed, camera, viewport_size, cursor_pos)
-            }
-        }
-    }
-
-    /// Translation gizmo logic.
-    fn update_translate(
-        &mut self,
-        mouse_pressed: bool,
-        camera: &CameraInfo,
-        viewport_size: Vec2,
-        cursor_pos: Vec2,
-    ) -> Option<GizmoResult> {
-        // If currently dragging
-        if let Some(drag) = &self.drag {
-            if !mouse_pressed {
-                // Drag ended
-                self.drag = None;
+        // ── Active drag: continue regardless of hit ──
+        if self.handler.is_dragging() {
+            let result = self
+                .handler
+                .continue_drag(mouse_pressed, camera, cursor_pos);
+            if !self.handler.is_dragging() {
+                // Drag just ended — clear common hover state.
                 self.hovered = None;
-                return None;
+                self.center_hovered = false;
             }
-
-            let axis = drag.axis;
-            let axis_dir = axis.direction();
-
-            // Compute world-space delta from screen-space cursor movement.
-            // Project cursor delta onto the axis's screen direction, then
-            // convert to world units. This is immune to camera rotation.
-            let cursor_delta = cursor_pos - drag.last_cursor;
-            let along_axis = cursor_delta.dot(drag.screen_axis_dir);
-            let world_delta = axis_dir * along_axis * drag.world_per_px;
-
-            self.drag = Some(DragState {
-                axis,
-                last_cursor: cursor_pos,
-                screen_axis_dir: drag.screen_axis_dir,
-                world_per_px: drag.world_per_px,
-            });
-
-            if world_delta.length() > 1e-8 {
-                return Some(GizmoResult::Translate(world_delta));
-            }
-            return None;
+            return result;
         }
 
-        // Not dragging — test hover
-        let hit = self.hit_test(camera, viewport_size, cursor_pos);
+        // ── Not dragging: use engine-provided hit ──
+        let axis_hit = match hit {
+            Some(GizmoHit::Axis(axis, _)) => Some(axis),
+            _ => None,
+        };
+        let center_hit = matches!(hit, Some(GizmoHit::Center));
 
         if mouse_pressed {
-            if let Some((axis, _dist)) = hit {
-                let axis_dir = axis.direction();
-                let vp = camera.view_projection;
-
-                // Compute the screen-space direction of this axis.
-                let p0 = world_to_screen(self.position, vp, viewport_size);
-                let p1 = world_to_screen(self.position + axis_dir, vp, viewport_size);
-
-                if let (Some(s0), Some(s1)) = (p0, p1) {
-                    let screen_dir = s1 - s0;
-                    let screen_len = screen_dir.length();
-                    if screen_len > 1e-6 {
-                        let screen_axis_dir = screen_dir / screen_len;
-                        // world_per_px: 1 world unit along this axis ≈ screen_len px
-                        let world_per_px = 1.0 / screen_len;
-
-                        self.drag = Some(DragState {
-                            axis,
-                            last_cursor: cursor_pos,
-                            screen_axis_dir,
-                            world_per_px,
-                        });
-                        self.hovered = Some(axis);
-                        return Some(GizmoResult::Hover(axis));
-                    }
+            // Axis takes priority over center.
+            if let Some(axis) = axis_hit {
+                if let Some(result) = self.handler.start_drag(
+                    axis,
+                    cursor_pos,
+                    self.position,
+                    scale,
+                    camera,
+                    viewport_size,
+                ) {
+                    self.hovered = Some(axis);
+                    self.center_hovered = false;
+                    return Some(result);
                 }
+                return None;
+            }
+            if center_hit && self.handler.supports_center() {
+                self.handler.start_center_drag(cursor_pos);
+                self.hovered = None;
+                self.center_hovered = true;
+                return Some(GizmoResult::HoverCenter);
             }
         }
 
-        let hit_axis = hit.map(|(axis, _)| axis);
-        self.hovered = hit_axis;
-        hit_axis.map(GizmoResult::Hover)
-    }
-
-    /// Test which axis the cursor is closest to (if within threshold).
-    ///
-    /// Returns the axis and the screen-space pixel distance to it.
-    fn hit_test(
-        &self,
-        camera: &CameraInfo,
-        viewport_size: Vec2,
-        cursor_pos: Vec2,
-    ) -> Option<(GizmoAxis, f32)> {
-        let mut best: Option<(GizmoAxis, f32)> = None;
-
-        for &axis in &GizmoAxis::ALL {
-            let arrow_start = self.position;
-            let arrow_end = self.position + axis.direction() * self.scale;
-            let shape = HitShape::segment(arrow_start, arrow_end, HIT_THRESHOLD_PX);
-
-            if let Some(dist) =
-                screen_hit_test(&shape, cursor_pos, camera.view_projection, viewport_size)
-            {
-                if best.is_none() || dist < best.unwrap().1 {
-                    best = Some((axis, dist));
-                }
-            }
+        // Update hover state.
+        if let Some(axis) = axis_hit {
+            self.hovered = Some(axis);
+            self.center_hovered = false;
+            return Some(GizmoResult::Hover(axis));
         }
 
-        best
+        if center_hit {
+            self.hovered = None;
+            let was_center = self.center_hovered;
+            self.center_hovered = true;
+            return if was_center {
+                None
+            } else {
+                Some(GizmoResult::HoverCenter)
+            };
+        }
+
+        // Not hovering anything.
+        let had_hover = self.hovered.is_some() || self.center_hovered;
+        self.hovered = None;
+        self.center_hovered = false;
+        if had_hover {
+            return Some(GizmoResult::Unhover);
+        }
+        None
     }
 
     /// Test if the cursor hits this gizmo without modifying internal state.
@@ -195,58 +197,26 @@ impl Gizmo {
         let camera = scene.camera()?;
         let viewport_size = scene.viewport_size();
 
-        // Resolve effective position (attached objects follow their target).
         let position = self
             .attached_to
             .and_then(|id| scene.object_position(id))
             .unwrap_or(self.position);
+        let scale = self.compute_scale_at(&camera, viewport_size.y, position);
 
-        self.probe_resolved(cursor_pos, &camera, viewport_size, position)
-    }
-
-    /// Read-only hit test with explicit context (avoids [`SceneHandle`] lock).
-    ///
-    /// Used by [`SceneHandle::process_gizmo`](crate::SceneHandle) to probe
-    /// multiple managed gizmos without re-acquiring the lock.
-    pub(crate) fn probe_at(
-        &self,
-        cursor_pos: Vec2,
-        ctx: &SceneContext,
-    ) -> Option<(GizmoAxis, f32)> {
-        let position = self
-            .attached_to
-            .and_then(|id| ctx.object_position(id))
-            .unwrap_or(self.position);
-        self.probe_resolved(cursor_pos, &ctx.camera, ctx.viewport_size, position)
-    }
-
-    /// Shared hit-test logic for [`probe`](Self::probe) and
-    /// [`probe_at`](Self::probe_at).
-    fn probe_resolved(
-        &self,
-        cursor_pos: Vec2,
-        camera: &CameraInfo,
-        viewport_size: Vec2,
-        position: glam::Vec3,
-    ) -> Option<(GizmoAxis, f32)> {
-        let scale = self.compute_scale_at(camera, viewport_size.y, position);
-
-        let mut best: Option<(GizmoAxis, f32)> = None;
-        for &axis in &GizmoAxis::ALL {
-            let arrow_start = position;
-            let arrow_end = position + axis.direction() * scale;
-            let shape = HitShape::segment(arrow_start, arrow_end, HIT_THRESHOLD_PX);
-
-            if let Some(dist) =
-                screen_hit_test(&shape, cursor_pos, camera.view_projection, viewport_size)
-            {
-                if best.is_none() || dist < best.unwrap().1 {
-                    best = Some((axis, dist));
-                }
-            }
+        let shapes = self.build_hit_shapes(position, scale, &camera, viewport_size);
+        let closest = screen_hit_test_closest(
+            shapes.into_iter().enumerate(),
+            cursor_pos,
+            camera.view_projection,
+            viewport_size,
+        )?;
+        let (index, dist) = closest;
+        match self.interpret_hit(index, dist) {
+            GizmoHit::Axis(axis, d) => Some((axis, d)),
+            // Center hit uses large distance so axis hits on other gizmos
+            // take priority in multi-gizmo contests.
+            GizmoHit::Center => Some((GizmoAxis::Y, f32::MAX / 2.0)),
         }
-
-        best
     }
 
     /// Clear the hover state without running input logic.
@@ -255,16 +225,6 @@ impl Gizmo {
     /// closest-hit contest.
     pub(crate) fn clear_hover(&mut self) {
         self.hovered = None;
+        self.center_hovered = false;
     }
-}
-
-// ──────────── Helpers ────────────
-
-/// Project a world-space point to screen-space pixels.
-pub(super) fn world_to_screen(
-    point: glam::Vec3,
-    view_proj: glam::Mat4,
-    viewport_size: Vec2,
-) -> Option<Vec2> {
-    crate::math::world_to_screen(point, view_proj, viewport_size)
 }

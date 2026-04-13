@@ -1,4 +1,4 @@
-//! Torus (donut) primitive.
+//! Torus (donut) and partial arc primitives.
 
 use super::Mesh;
 use crate::pipeline::gpu_types::Vertex;
@@ -18,6 +18,33 @@ impl Mesh {
         major_segments: u32,
         minor_segments: u32,
     ) -> Self {
+        Self::torus_arc(
+            major_radius,
+            minor_radius,
+            0.0,
+            2.0 * PI,
+            major_segments,
+            minor_segments,
+        )
+    }
+
+    /// Partial torus arc centered at the origin in the XZ plane.
+    ///
+    /// - `major_radius`: distance from center to tube center
+    /// - `minor_radius`: tube radius
+    /// - `start_angle`: start angle in radians (0 = +X direction in XZ plane)
+    /// - `sweep`: sweep angle in radians (positive = counter-clockwise)
+    /// - `major_segments`: divisions along the arc (min 3)
+    /// - `minor_segments`: divisions around the tube cross-section (min 3)
+    #[must_use]
+    pub fn torus_arc(
+        major_radius: f32,
+        minor_radius: f32,
+        start_angle: f32,
+        sweep: f32,
+        major_segments: u32,
+        minor_segments: u32,
+    ) -> Self {
         let major_segments = major_segments.max(3);
         let minor_segments = minor_segments.max(3);
         let mut verts = Vec::new();
@@ -25,8 +52,8 @@ impl Mesh {
         for i in 0..major_segments {
             let u0 = i as f32 / major_segments as f32;
             let u1 = (i + 1) as f32 / major_segments as f32;
-            let theta0 = u0 * 2.0 * PI;
-            let theta1 = u1 * 2.0 * PI;
+            let theta0 = start_angle + u0 * sweep;
+            let theta1 = start_angle + u1 * sweep;
 
             for j in 0..minor_segments {
                 let v0 = j as f32 / minor_segments as f32;
@@ -88,7 +115,53 @@ impl Mesh {
 
         Self {
             vertices: verts,
-            label: "ic3d torus".into(),
+            label: "ic3d torus arc".into(),
+        }
+    }
+
+    /// Flat disc (filled circle) in the XZ plane at y=0.
+    ///
+    /// Uses a triangle fan from center to `segments` rim vertices.
+    /// Suitable for angle indicator wedges when combined with a partial sweep.
+    ///
+    /// - `radius`: disc radius
+    /// - `start_angle`: start angle in radians
+    /// - `sweep`: sweep angle in radians
+    /// - `segments`: number of triangle-fan slices (min 3)
+    #[must_use]
+    pub fn disc_arc(radius: f32, start_angle: f32, sweep: f32, segments: u32) -> Self {
+        let segments = segments.max(3);
+        let mut verts = Vec::new();
+        let normal = [0.0, 1.0, 0.0];
+        let center = [0.0_f32, 0.0, 0.0];
+
+        for i in 0..segments {
+            let a0 = start_angle + sweep * (i as f32 / segments as f32);
+            let a1 = start_angle + sweep * ((i + 1) as f32 / segments as f32);
+
+            let p0 = [radius * a0.cos(), 0.0, radius * a0.sin()];
+            let p1 = [radius * a1.cos(), 0.0, radius * a1.sin()];
+
+            verts.push(Vertex {
+                pos: center,
+                normal,
+                uv: [0.5, 0.5],
+            });
+            verts.push(Vertex {
+                pos: p0,
+                normal,
+                uv: [0.5 + 0.5 * a0.cos(), 0.5 + 0.5 * a0.sin()],
+            });
+            verts.push(Vertex {
+                pos: p1,
+                normal,
+                uv: [0.5 + 0.5 * a1.cos(), 0.5 + 0.5 * a1.sin()],
+            });
+        }
+
+        Self {
+            vertices: verts,
+            label: "ic3d disc arc".into(),
         }
     }
 }

@@ -26,6 +26,7 @@
 //! once per frame to drive all overlays.
 
 use crate::graph::Node;
+use crate::math::HitShape;
 use crate::scene::context::{SceneContext, SceneHandle};
 use crate::scene::object::SceneObjectId;
 use crate::widget::MeshDrawGroup;
@@ -152,6 +153,23 @@ pub trait Overlay: fmt::Debug + Send + Sync {
     /// that should never intercept mouse events.
     fn interactive(&self) -> bool {
         true
+    }
+
+    /// Declare hittable shapes for engine-managed hit testing.
+    ///
+    /// Called by [`SceneHandle::process_gizmo`](crate::SceneHandle) and
+    /// potentially by [`SceneGraph::process_input`](crate::graph::SceneGraph::process_input)
+    /// to determine which overlay the cursor is closest to, without each
+    /// overlay performing its own hit testing internally.
+    ///
+    /// Return an ordered list of [`HitShape`]s. The engine tests all shapes
+    /// across all overlays via [`screen_hit_test_closest`](crate::math::screen_hit_test_closest)
+    /// and passes the winning shape index back to the overlay.
+    ///
+    /// Default implementation returns no shapes (overlay handles its own
+    /// hit testing in [`on_input`](Self::on_input)).
+    fn hit_shapes(&self, _ctx: &SceneContext) -> Vec<HitShape> {
+        Vec::new()
     }
 
     /// Generate [`MeshDrawGroup`]s for rendering this overlay.

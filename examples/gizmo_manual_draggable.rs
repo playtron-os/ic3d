@@ -1,19 +1,17 @@
-//! Custom gizmo example — demonstrates building your own gizmo type
-//! with the **scene graph** for retained-mode scene management.
+//! Simple custom gizmo using [`DraggableOverlay`].
+//!
+//! Demonstrates the **simplest path** for building a custom overlay:
+//! single hit point, pixel deltas, 3 methods. The engine handles hit
+//! testing, hover detection, drag start/end, and delta computation.
 //!
 //! Creates a **uniform-scale gizmo**: a small center cube that the user
-//! can drag vertically to scale an object. This shows the manual/power-user
-//! path for custom gizmo types that the built-in `Gizmo` doesn't cover:
+//! can drag vertically to scale an object up/down.
 //!
-//! 1. Build the scene with `SceneGraph` (camera, lights, meshes, hierarchy)
-//! 2. Define a custom gizmo struct implementing `DraggableOverlay`
-//! 3. The engine handles hit testing, drag tracking, and input routing
-//!
-//! For standard translation gizmos, use the managed API instead:
-//! `scene.select(id, GizmoMode::Translate)` — see `gizmo.rs`.
+//! For multi-shape hit testing (segments, arcs, per-axis handles), see
+//! the `gizmo_manual_interactive` example instead.
 //!
 //! ```bash
-//! cargo run --example gizmo_manual
+//! cargo run --example gizmo_manual_draggable
 //! ```
 
 use ic3d::glam::{Vec2, Vec3};
@@ -30,7 +28,7 @@ use iced::{Element, Length, Subscription, Theme};
 fn main() -> iced::Result {
     tracing_subscriber::fmt::init();
     iced::application(App::new, App::update, App::view)
-        .title("ic3d custom gizmo")
+        .title("ic3d · DraggableOverlay — uniform scale")
         .subscription(App::subscription)
         .theme(App::theme)
         .run()
@@ -38,8 +36,7 @@ fn main() -> iced::Result {
 
 // ─────────────── Custom Scale Gizmo ───────────────
 
-/// On-screen gizmo size. Controls how many screen
-/// pixels the handle spans.
+/// On-screen gizmo size in pixels.
 const GIZMO_SIZE: f32 = 80.0;
 /// Sensitivity: scale change per pixel of vertical drag.
 const SCALE_PER_PX: f32 = 0.005;
@@ -51,9 +48,6 @@ const CENTER_SIZE: f32 = 0.12;
 /// Drag vertically on the cube to scale the attached object uniformly.
 /// Implements [`DraggableOverlay`] — the engine handles hit testing,
 /// drag tracking, and input routing automatically.
-///
-/// Uses the engine's selection API via [`DraggableOverlay::resolve_target`]
-/// — the gizmo automatically follows whichever object is selected.
 #[derive(Debug, Clone, Default)]
 struct ScaleGizmo;
 
@@ -116,15 +110,12 @@ enum Message {
 
 impl App {
     fn new() -> Self {
-        // ── Build the scene graph ──
         let mut graph = SceneGraph::new();
 
-        // Materials
         let ground_mat =
             graph.add_material(Material::new(Vec3::new(0.35, 0.35, 0.38)).with_shininess(8.0));
         let blue = graph.add_material(Material::new(Vec3::new(0.2, 0.6, 0.9)).with_shininess(64.0));
 
-        // Camera
         graph.add_camera(
             PerspectiveCamera::new()
                 .position(Vec3::new(6.0, 5.0, 8.0))
@@ -132,7 +123,6 @@ impl App {
                 .clip(0.1, 50.0),
         );
 
-        // Lighting
         graph.add_light(
             DirectionalLight::new(
                 Vec3::new(-0.4, -0.8, -0.3).normalize(),
@@ -145,24 +135,20 @@ impl App {
         );
         graph.add_light(AmbientLight::new(0.2));
 
-        // Ground plane
         let _ = graph
             .add_mesh("ground", Mesh::plane(20.0, 20.0))
             .material(ground_mat)
             .position(Vec3::new(0.0, -0.01, 0.0));
 
-        // The cube — tracked by ID so the custom gizmo can find it.
         let cube_id = graph
             .add_mesh("cube", Mesh::cube(1.0))
             .material(blue)
             .position(Vec3::new(0.0, 1.0, 0.0))
             .id();
 
-        // Create the scale gizmo and register it as an overlay.
         graph.add_overlay(Draggable::new(ScaleGizmo));
 
         let handle = SceneHandle::new();
-        // Select the cube — the custom gizmo picks it up via resolve_target.
         handle.select_object(cube_id);
 
         Self {

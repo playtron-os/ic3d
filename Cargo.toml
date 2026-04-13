@@ -46,8 +46,12 @@ name = "gizmo"
 path = "examples/gizmo.rs"
 
 [[example]]
-name = "gizmo_manual"
-path = "examples/gizmo_manual.rs"
+name = "gizmo_manual_draggable"
+path = "examples/gizmo_manual_draggable.rs"
+
+[[example]]
+name = "gizmo_manual_interactive"
+path = "examples/gizmo_manual_interactive.rs"
 
 [[example]]
 name = "showcase_advanced"

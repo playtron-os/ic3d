@@ -10,17 +10,18 @@
 //! ```
 
 use ic3d::gizmo::{GizmoMode, GizmoResult};
-use ic3d::glam::Vec3;
+use ic3d::glam::{self, Vec3};
 use ic3d::graph::{AmbientLight, Material, SceneGraph};
 use ic3d::widget::scene_3d;
 use ic3d::{DirectionalLight, Mesh, PerspectiveCamera, SceneHandle, SceneObjectId};
 use iced::widget::{column, container, text};
-use iced::{Element, Length, Theme};
+use iced::{keyboard, Element, Length, Subscription, Theme};
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt::init();
     iced::application(App::new, App::update, App::view)
         .title("ic3d gizmo")
+        .subscription(App::subscription)
         .theme(App::theme)
         .run()
 }
@@ -29,12 +30,14 @@ struct App {
     handle: SceneHandle,
     graph: SceneGraph,
     cube_id: SceneObjectId,
+    mode: GizmoMode,
     status: String,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Gizmo(SceneObjectId, GizmoResult),
+    SetMode(GizmoMode),
 }
 
 impl App {
@@ -89,18 +92,35 @@ impl App {
             handle,
             graph,
             cube_id,
-            status: "Hover over an axis arrow and drag to move the cube".into(),
+            mode: GizmoMode::Translate,
+            status: "[T] Translate  [R] Rotate — drag an axis to move the cube".into(),
         }
     }
 
     fn update(&mut self, message: Message) {
         match message {
+            Message::SetMode(mode) => {
+                self.mode = mode;
+                self.handle.modify_gizmo(self.cube_id, |g| g.set_mode(mode));
+                let label = match mode {
+                    GizmoMode::Translate => "Translate",
+                    GizmoMode::Rotate => "Rotate",
+                };
+                self.status = format!("[T] Translate  [R] Rotate — mode: {label}");
+            }
             Message::Gizmo(_id, result) => match result {
                 GizmoResult::Hover(axis) => {
                     self.status = format!("Hovering: {axis:?} axis");
                 }
+                GizmoResult::HoverCenter => {
+                    self.status = "Hovering: free rotate (center)".into();
+                }
                 GizmoResult::Unhover => {
-                    self.status = "Hover over an axis arrow and drag to move the cube".into();
+                    let label = match self.mode {
+                        GizmoMode::Translate => "Translate",
+                        GizmoMode::Rotate => "Rotate",
+                    };
+                    self.status = format!("[T] Translate  [R] Rotate — mode: {label}");
                 }
                 GizmoResult::Translate(delta) => {
                     if let Some(node) = self.graph.node_mut(self.cube_id) {
@@ -108,7 +128,34 @@ impl App {
                         node.set_position(pos);
                     }
                     let pos = self.graph.world_position(self.cube_id);
-                    self.status = format!("Position: ({:.2}, {:.2}, {:.2})", pos.x, pos.y, pos.z,);
+                    self.status = format!("Position: ({:.2}, {:.2}, {:.2})", pos.x, pos.y, pos.z);
+                }
+                GizmoResult::Rotate(euler) => {
+                    if let Some(node) = self.graph.node_mut(self.cube_id) {
+                        let current = node.local_transform().rotation;
+                        let delta =
+                            glam::Quat::from_euler(glam::EulerRot::XYZ, euler.x, euler.y, euler.z);
+                        node.set_rotation(delta * current);
+                    }
+                    self.status = format!(
+                        "Rotation: ({:.1}°, {:.1}°, {:.1}°)",
+                        euler.x.to_degrees(),
+                        euler.y.to_degrees(),
+                        euler.z.to_degrees(),
+                    );
+                }
+                GizmoResult::FreeRotate(quat) => {
+                    if let Some(node) = self.graph.node_mut(self.cube_id) {
+                        let current = node.local_transform().rotation;
+                        node.set_rotation(quat * current);
+                    }
+                    let (x, y, z) = quat.to_euler(glam::EulerRot::XYZ);
+                    self.status = format!(
+                        "Free rotate: ({:.1}°, {:.1}°, {:.1}°)",
+                        x.to_degrees(),
+                        y.to_degrees(),
+                        z.to_degrees(),
+                    );
                 }
             },
         }
@@ -134,6 +181,25 @@ impl App {
                 .center_x(Length::Fill),
         ]
         .into()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        keyboard::listen().map(|event| {
+            if let keyboard::Event::KeyPressed {
+                key: keyboard::Key::Character(ref c),
+                ..
+            } = event
+            {
+                match c.as_str() {
+                    "t" => return Message::SetMode(GizmoMode::Translate),
+                    "r" => return Message::SetMode(GizmoMode::Rotate),
+                    _ => {}
+                }
+            }
+            // Keyboard events that don't match any hotkey produce a no-op
+            // gizmo message (the app ignores Unhover when nothing is hovered).
+            Message::Gizmo(SceneObjectId::default(), GizmoResult::Unhover)
+        })
     }
 }
 

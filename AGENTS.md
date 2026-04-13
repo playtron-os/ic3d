@@ -314,8 +314,11 @@ cargo run --example showcase
 # Translation gizmo — drag axes to move a cube (scene graph)
 cargo run --example gizmo
 
-# Custom overlay — scale gizmo built with DraggableOverlay (scene graph)
-cargo run --example gizmo_manual
+# Custom overlay — uniform scale gizmo built with DraggableOverlay (single point, pixel deltas)
+cargo run --example gizmo_manual_draggable
+
+# Custom overlay — 3-axis scale gizmo built with InteractiveOverlay (multi-shape, per-axis drag)
+cargo run --example gizmo_manual_interactive
 
 # Custom shader — iridescent crystal hex columns with energy veins
 cargo run --example crystal

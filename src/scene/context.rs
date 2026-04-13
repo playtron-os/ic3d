@@ -11,6 +11,7 @@
 
 use crate::camera::CameraInfo;
 use crate::gizmo::{Gizmo, GizmoMode, GizmoResult};
+use crate::math::screen_hit_test_closest;
 use crate::overlay::base::{Overlay, OverlayInput};
 use crate::scene::object::SceneObjectId;
 use crate::widget::MeshDrawGroup;
@@ -181,11 +182,7 @@ impl SceneHandle {
     /// Whether any managed gizmo's axis handle is being hovered.
     #[must_use]
     pub(crate) fn gizmo_hovered(&self) -> bool {
-        self.0
-            .read()
-            .gizmos
-            .values()
-            .any(|g| g.hovered_axis().is_some())
+        self.0.read().gizmos.values().any(|g| g.is_hovered())
     }
 
     // ──────────── Lightweight selection ────────────
@@ -283,9 +280,14 @@ impl SceneHandle {
     /// Process one frame of managed gizmo input.
     ///
     /// Called by the widget's `Program::update()` with cursor state.
-    /// Handles closest-hit picking automatically: probes all managed gizmos,
-    /// picks the closest one, updates only the winner, and clears hover on
-    /// the rest. During an active drag, only the dragging gizmo is updated.
+    /// Uses engine-side hit testing: collects [`hit_shapes`](Overlay::hit_shapes)
+    /// from all managed gizmos, runs [`screen_hit_test_closest`] once to
+    /// find the winning gizmo and shape, then passes the result via
+    /// [`update_with_hit`](Gizmo::update_with_hit). This eliminates
+    /// redundant hit testing inside each gizmo.
+    ///
+    /// During an active drag, only the dragging gizmo is updated (no
+    /// hit testing needed).
     ///
     /// Returns the interacted object ID and result if interaction occurred.
     pub(crate) fn process_gizmo(
@@ -300,11 +302,9 @@ impl SceneHandle {
             return None;
         }
 
-        // Extract camera/viewport (both Copy) from context.
-        let (camera, viewport) = {
-            let ctx = inner.context.as_ref()?;
-            (ctx.camera, ctx.viewport_size)
-        };
+        let ctx = inner.context.as_ref()?;
+        let camera = ctx.camera;
+        let viewport = ctx.viewport_size;
 
         // If any gizmo is actively dragging, only update that one.
         let dragging_id =
@@ -314,46 +314,56 @@ impl SceneHandle {
                 .find_map(|(&id, g)| if g.is_dragging() { Some(id) } else { None });
 
         if let Some(id) = dragging_id {
-            let obj_pos = inner.context.as_ref().and_then(|c| c.object_position(id));
-            let gizmo = inner.gizmos.get_mut(&id)?;
-            if let Some(pos) = obj_pos {
-                gizmo.set_position(pos);
+            if let Some(pos) = ctx.object_position(id) {
+                if let Some(gizmo) = inner.gizmos.get_mut(&id) {
+                    gizmo.set_position(pos);
+                }
             }
+            let gizmo = inner.gizmos.get_mut(&id)?;
             return gizmo
-                .update_with_camera(cursor, mouse_pressed, &camera, viewport)
+                .update_with_hit(cursor, mouse_pressed, &camera, viewport, None)
                 .map(|r| (id, r));
         }
 
-        // No active drag — probe all gizmos, find closest hit.
-        let (winner_id, winner_pos) = {
-            let ctx = inner.context.as_ref()?;
-            let mut closest: Option<(SceneObjectId, f32)> = None;
-            for (&id, gizmo) in &inner.gizmos {
-                if !gizmo.is_interactive() {
-                    continue;
-                }
-                if let Some((_, dist)) = gizmo.probe_at(cursor, ctx) {
-                    if closest.is_none_or(|(_, d)| dist < d) {
-                        closest = Some((id, dist));
-                    }
-                }
-            }
-            let winner = closest.map(|(id, _)| id);
-            let pos = winner.and_then(|id| ctx.object_position(id));
-            (winner, pos)
-        };
+        // No active drag — engine-side hit testing across all gizmos.
+        // Collect hit shapes from all interactive gizmos, tagged with
+        // (gizmo_id, shape_index).
+        let shapes = inner
+            .gizmos
+            .iter()
+            .filter(|(_, g)| g.is_interactive())
+            .flat_map(|(&id, gizmo)| {
+                let pos = ctx.object_position(id).unwrap_or(gizmo.gizmo_position());
+                let scale = gizmo.compute_scale_at(&camera, viewport.y, pos);
+                gizmo
+                    .build_hit_shapes(pos, scale, &camera, viewport)
+                    .into_iter()
+                    .enumerate()
+                    .map(move |(i, shape)| ((id, i), shape))
+            });
 
-        // Update winner gizmo with real input, clear hover on all others.
+        let closest = screen_hit_test_closest(shapes, cursor, camera.view_projection, viewport);
+
+        let winner = closest.map(|((id, shape_idx), dist)| {
+            let gizmo = &inner.gizmos[&id];
+            let hit = gizmo.interpret_hit(shape_idx, dist);
+            (id, hit)
+        });
+
+        let winner_id = winner.map(|(id, _)| id);
+
+        // Update winner gizmo with the hit, clear hover on all others.
         let mut result = None;
         let ids: Vec<SceneObjectId> = inner.gizmos.keys().copied().collect();
         for id in ids {
             if let Some(gizmo) = inner.gizmos.get_mut(&id) {
                 if Some(id) == winner_id {
-                    if let Some(pos) = winner_pos {
+                    if let Some(pos) = ctx.object_position(id) {
                         gizmo.set_position(pos);
                     }
+                    let hit = winner.map(|(_, h)| h);
                     result = gizmo
-                        .update_with_camera(cursor, mouse_pressed, &camera, viewport)
+                        .update_with_hit(cursor, mouse_pressed, &camera, viewport, hit)
                         .map(|r| (id, r));
                 } else {
                     gizmo.clear_hover();

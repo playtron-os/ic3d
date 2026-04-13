@@ -37,6 +37,6 @@ fn compose_overlay_shader_includes_preludes() {
 #[test]
 fn compose_overlay_shader_no_shadow_pcf() {
     let result = compose_overlay_shader();
-    // Flat shader should NOT include shadow sampling
+    // Lit overlay shader should NOT include shadow sampling
     assert!(!result.contains("sample_shadow_pcf"));
 }

@@ -40,6 +40,7 @@ pub use scene::object::SceneObjectId;
 // ── Re-exports: overlay ──
 pub use overlay::base::{Overlay, OverlayContext, OverlayEvent, OverlayInput};
 pub use overlay::draggable::{DragState, Draggable, DraggableOverlay};
+pub use overlay::interactive::{Interactive, InteractiveContext, InteractiveOverlay, ShapeHit};
 
 // ── Re-exports: pipeline ──
 pub use pipeline::buffer::{BufferPool, DynBuffer};
@@ -51,7 +52,8 @@ pub use pipeline::gpu_types::{
 pub use pipeline::post_process::PostProcessPass;
 pub use pipeline::render_pipeline::{PipelineConfig, RenderPipeline3D};
 pub use pipeline::shaders::{
-    BLINN_PHONG_WGSL, SCENE_UNIFORMS_WGSL, SHADOW_PCF_WGSL, STANDARD_VS_WGSL, VERTEX_IO_WGSL,
+    BLINN_PHONG_WGSL, FLAT_COLOR_WGSL, SCENE_UNIFORMS_WGSL, SHADOW_PCF_WGSL, STANDARD_VS_WGSL,
+    VERTEX_IO_WGSL,
 };
 pub use pipeline::shadow::{DrawCall, ShadowPass};
 pub use pipeline::utils::compose_shader;

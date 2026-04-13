@@ -23,11 +23,11 @@ pub fn compose_shader(fragment_wgsl: &str) -> String {
     )
 }
 
-/// Compose the overlay (flat/unlit) shader.
+/// Compose the overlay (flat) shader.
 ///
 /// Prepends scene uniforms, vertex IO, and standard vertex shader, then
-/// appends the built-in flat-color fragment shader. The resulting shader
-/// outputs `material.rgba` directly with no lighting or shadow sampling.
+/// appends the flat color fragment shader. Overlays render as solid color
+/// without lighting or shadow sampling.
 #[must_use]
 pub(crate) fn compose_overlay_shader() -> String {
     format!(

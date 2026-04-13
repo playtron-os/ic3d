@@ -13,6 +13,20 @@ use iced::widget::shader::{self, Viewport};
 use iced::Rectangle;
 use std::fmt;
 
+/// Check whether cached mesh buffers are stale relative to incoming draw groups.
+///
+/// Compares group count and per-group vertex count — cheap and sufficient to
+/// detect mesh swaps (e.g. arrow ↔ torus when gizmo mode changes).
+fn meshes_changed(cached: &[MeshBuffer], draws: &[MeshDrawGroup]) -> bool {
+    if cached.len() != draws.len() {
+        return true;
+    }
+    cached
+        .iter()
+        .zip(draws)
+        .any(|(buf, group)| buf.vertex_count() != group.mesh.vertex_count())
+}
+
 use parking_lot::Mutex;
 
 use super::types::PostProcessFactory;
@@ -83,8 +97,8 @@ impl shader::Primitive for Scene3DPrimitive {
             &all_instances,
         );
 
-        // Upload mesh buffers if needed (first frame or mesh count changed).
-        if pipeline.mesh_buffers.len() != self.draws.len() {
+        // Upload mesh buffers if needed (group count or per-mesh vertex count changed).
+        if meshes_changed(&pipeline.mesh_buffers, &self.draws) {
             pipeline.mesh_buffers = self.draws.iter().map(|d| d.mesh.upload(device)).collect();
         }
 
@@ -93,8 +107,8 @@ impl shader::Primitive for Scene3DPrimitive {
             queue.write_buffer(buf, 0, bytes);
         }
 
-        // Upload overlay mesh buffers if needed.
-        if pipeline.overlay_mesh_buffers.len() != self.overlay_groups.len() {
+        // Upload overlay mesh buffers if needed (group count or mesh changed).
+        if meshes_changed(&pipeline.overlay_mesh_buffers, &self.overlay_groups) {
             pipeline.overlay_mesh_buffers = self
                 .overlay_groups
                 .iter()

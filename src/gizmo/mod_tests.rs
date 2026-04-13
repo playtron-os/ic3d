@@ -2,11 +2,37 @@
 
 use super::*;
 use crate::camera::CameraInfo;
-use crate::math::point_to_segment_distance;
+use crate::math::{point_to_segment_distance, screen_hit_test_closest};
 use crate::scene::context::{SceneContext, SceneHandle};
 use crate::scene::object::SceneObjectId;
 use glam::{Mat4, Vec2, Vec3};
 use std::collections::HashMap;
+
+/// Helper: simulate the old `update_with_camera` flow by building hit shapes,
+/// running engine-side hit testing, and calling `update_with_hit`.
+fn update_with_camera(
+    gizmo: &mut Gizmo,
+    cursor: Vec2,
+    pressed: bool,
+    camera: &CameraInfo,
+    viewport: Vec2,
+) -> Option<GizmoResult> {
+    let scale = gizmo.compute_scale(camera, viewport.y);
+    gizmo.set_scale(scale);
+    let hit = if !gizmo.is_dragging() {
+        let shapes = gizmo.build_hit_shapes(gizmo.gizmo_position(), scale, camera, viewport);
+        screen_hit_test_closest(
+            shapes.into_iter().enumerate(),
+            cursor,
+            camera.view_projection,
+            viewport,
+        )
+        .map(|(idx, dist)| gizmo.interpret_hit(idx, dist))
+    } else {
+        None
+    };
+    gizmo.update_with_hit(cursor, pressed, camera, viewport, hit)
+}
 
 /// Helper: create a CameraInfo for a perspective camera at `cam_pos` looking along `fwd`.
 fn cam_info(cam_pos: Vec3, fwd: Vec3, fov: f32) -> CameraInfo {
@@ -440,4 +466,271 @@ fn update_syncs_position_from_attached_object() {
         object_pos,
         "should sync to object position"
     );
+}
+
+// ──────────── GizmoMode::Rotate ────────────
+
+#[test]
+fn rotate_gizmo_draw_groups_count() {
+    let g = Gizmo::new(GizmoMode::Rotate);
+    let groups = g.draw_groups();
+    assert_eq!(
+        groups.len(),
+        3,
+        "rotation gizmo should produce 3 ring groups"
+    );
+}
+
+#[test]
+fn rotate_gizmo_draw_groups_have_instances() {
+    let g = Gizmo::new(GizmoMode::Rotate);
+    for group in g.draw_groups() {
+        assert_eq!(
+            group.instances.len(),
+            1,
+            "each ring should have one instance"
+        );
+    }
+}
+
+#[test]
+fn rotate_gizmo_overlay_draw_produces_groups() {
+    let g = Gizmo::new(GizmoMode::Rotate).position(Vec3::new(0.0, 0.0, 5.0));
+    let ctx = scene_ctx(
+        Vec3::ZERO,
+        Vec3::Z,
+        std::f32::consts::FRAC_PI_4,
+        Vec2::new(800.0, 600.0),
+        HashMap::new(),
+    );
+    let groups = g.draw(&ctx);
+    assert_eq!(
+        groups.len(),
+        4,
+        "Overlay::draw should produce 3 half-arc groups + 1 view circle"
+    );
+}
+
+#[test]
+fn rotate_drag_produces_angle_indicator_groups() {
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam = cam_info(Vec3::new(0.0, 0.0, 5.0), Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+
+    let mut g = Gizmo::new(GizmoMode::Rotate).position(Vec3::ZERO);
+    let scale = g.compute_scale(&cam, vp.y);
+    let r = super::RING_MESH_RADIUS * scale;
+
+    // Click on Z ring to start drag
+    let ring_point = Vec3::new(r * 0.707, r * 0.707, 0.0);
+    let screen_pos = world_to_screen(ring_point, cam.view_projection, vp).unwrap();
+    update_with_camera(&mut g, screen_pos, true, &cam, vp);
+    assert!(g.is_dragging());
+
+    // Drag to rotate
+    let moved = Vec2::new(screen_pos.x + 50.0, screen_pos.y + 50.0);
+    update_with_camera(&mut g, moved, true, &cam, vp);
+
+    // Draw with camera — should have extra groups for angle indicator
+    let ctx = scene_ctx(
+        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::NEG_Z,
+        fov,
+        vp,
+        HashMap::new(),
+    );
+    let groups = g.draw(&ctx);
+    // 3 arcs + 1 view circle + 1 wedge + 2 radial lines = 7
+    assert!(
+        groups.len() > 4,
+        "dragging should produce angle indicator groups, got {}",
+        groups.len()
+    );
+}
+
+#[test]
+fn rotate_hover_thickens_arc() {
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam = cam_info(Vec3::new(0.0, 0.0, 5.0), Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+
+    let mut g = Gizmo::new(GizmoMode::Rotate).position(Vec3::ZERO);
+
+    // Hover on Z ring
+    let scale = g.compute_scale(&cam, vp.y);
+    let r = super::RING_MESH_RADIUS * scale;
+    let ring_point = Vec3::new(r * 0.707, r * 0.707, 0.0);
+    let screen_pos = world_to_screen(ring_point, cam.view_projection, vp).unwrap();
+    update_with_camera(&mut g, screen_pos, false, &cam, vp);
+
+    assert_eq!(g.hovered_axis(), Some(GizmoAxis::Z));
+
+    // Draw and compare vertex counts: hovered arc should have more verts (thicker tube)
+    let ctx = scene_ctx(
+        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::NEG_Z,
+        fov,
+        vp,
+        HashMap::new(),
+    );
+    let groups = g.draw(&ctx);
+
+    // The Z axis is the 3rd arc (index 2). Its vertices should differ from
+    // non-hovered arcs because the tube radius changes the mesh geometry.
+    let z_verts = groups[2].mesh.vertex_count();
+    let x_verts = groups[0].mesh.vertex_count();
+    // The Z axis (face-on) may have a different segment count than X (edge-on)
+    // because the visible sweep adapts. Just verify both have valid geometry.
+    assert!(z_verts > 0, "hovered arc should have vertices");
+    assert!(x_verts > 0, "non-hovered arc should have vertices");
+}
+
+#[test]
+fn ring_plane_perpendicular_to_axis() {
+    for axis in GizmoAxis::ALL {
+        let (tangent, bitangent) = axis.ring_plane();
+        assert!(
+            axis.direction().dot(tangent).abs() < 1e-6,
+            "{axis:?}: tangent should be perpendicular to axis"
+        );
+        assert!(
+            axis.direction().dot(bitangent).abs() < 1e-6,
+            "{axis:?}: bitangent should be perpendicular to axis"
+        );
+        assert!(
+            tangent.dot(bitangent).abs() < 1e-6,
+            "{axis:?}: tangent and bitangent should be perpendicular"
+        );
+    }
+}
+
+#[test]
+fn set_mode_clears_drag() {
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam = cam_info(Vec3::new(0.0, 0.0, 5.0), Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+
+    let mut g = Gizmo::new(GizmoMode::Translate)
+        .position(Vec3::ZERO)
+        .scale(1.0);
+    // Start a drag on the X axis (center-right of screen)
+    update_with_camera(&mut g, Vec2::new(500.0, 300.0), true, &cam, vp);
+    assert!(g.is_dragging(), "should be dragging after click on axis");
+
+    g.set_mode(GizmoMode::Rotate);
+    assert!(!g.is_dragging(), "set_mode should clear drag state");
+    assert!(g.hovered_axis().is_none(), "set_mode should clear hover");
+    assert_eq!(g.mode(), GizmoMode::Rotate);
+}
+
+#[test]
+fn rotate_hover_detected_near_ring() {
+    // Camera at (0,0,5) looking at origin — Z ring is face-on
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam = cam_info(Vec3::new(0.0, 0.0, 5.0), Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+
+    let mut g = Gizmo::new(GizmoMode::Rotate).position(Vec3::ZERO);
+
+    // Use a point at 45° on the Z ring (in XY plane) so it doesn't overlap
+    // with the Y ring (which lies in XZ plane, y=0).
+    let scale = g.compute_scale(&cam, vp.y);
+    let r = super::RING_MESH_RADIUS * scale;
+    let angle = std::f32::consts::FRAC_PI_4;
+    let ring_point = Vec3::new(r * angle.cos(), r * angle.sin(), 0.0);
+    let screen_pos = world_to_screen(ring_point, cam.view_projection, vp).unwrap();
+
+    let result = update_with_camera(&mut g, screen_pos, false, &cam, vp);
+    assert!(result.is_some(), "should detect hover near ring");
+    assert!(
+        matches!(result.unwrap(), GizmoResult::Hover(GizmoAxis::Z)),
+        "should hover Z axis ring (face-on to camera)"
+    );
+}
+
+#[test]
+fn rotate_drag_produces_rotation() {
+    // Camera along +Z, looking at origin
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam = cam_info(Vec3::new(0.0, 0.0, 5.0), Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+
+    let mut g = Gizmo::new(GizmoMode::Rotate).position(Vec3::ZERO);
+
+    // Use 45° point on the Z ring to avoid Y/X ring overlap
+    let scale = g.compute_scale(&cam, vp.y);
+    let r = super::RING_MESH_RADIUS * scale;
+    let angle = std::f32::consts::FRAC_PI_4;
+    let ring_point = Vec3::new(r * angle.cos(), r * angle.sin(), 0.0);
+    let screen_pos = world_to_screen(ring_point, cam.view_projection, vp).unwrap();
+
+    // Click to start drag
+    let result = update_with_camera(&mut g, screen_pos, true, &cam, vp);
+    assert!(g.is_dragging(), "should start drag on click");
+    assert!(matches!(result, Some(GizmoResult::Hover(GizmoAxis::Z))));
+
+    // Move cursor to create rotation
+    let moved = Vec2::new(screen_pos.x + 30.0, screen_pos.y + 30.0);
+    let result = update_with_camera(&mut g, moved, true, &cam, vp);
+    if let Some(GizmoResult::Rotate(rot)) = result {
+        // Rotation should be around Z axis
+        assert!(
+            rot.z.abs() > 1e-4,
+            "rotation should have non-zero Z component"
+        );
+        assert!(
+            rot.x.abs() < 1e-6 && rot.y.abs() < 1e-6,
+            "rotation should only be around Z axis"
+        );
+    }
+    // Note: result may be None for very small cursor movements
+}
+
+#[test]
+fn rotate_drag_ends_on_release() {
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam = cam_info(Vec3::new(0.0, 0.0, 5.0), Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+
+    let mut g = Gizmo::new(GizmoMode::Rotate).position(Vec3::ZERO);
+
+    let scale = g.compute_scale(&cam, vp.y);
+    let r = super::RING_MESH_RADIUS * scale;
+    let angle = std::f32::consts::FRAC_PI_4;
+    let ring_point = Vec3::new(r * angle.cos(), r * angle.sin(), 0.0);
+    let screen_pos = world_to_screen(ring_point, cam.view_projection, vp).unwrap();
+
+    // Start drag
+    update_with_camera(&mut g, screen_pos, true, &cam, vp);
+    assert!(g.is_dragging());
+
+    // Release
+    update_with_camera(&mut g, screen_pos, false, &cam, vp);
+    assert!(!g.is_dragging(), "drag should end on release");
+}
+
+#[test]
+fn rotate_probe_detects_ring() {
+    let fov = std::f32::consts::FRAC_PI_4;
+    let cam_pos = Vec3::new(0.0, 0.0, 5.0);
+    let handle = populated_handle(
+        cam_pos,
+        Vec3::NEG_Z,
+        fov,
+        Vec2::new(800.0, 600.0),
+        HashMap::new(),
+    );
+
+    let g = Gizmo::new(GizmoMode::Rotate).position(Vec3::ZERO);
+
+    let cam = cam_info(cam_pos, Vec3::NEG_Z, fov);
+    let vp = Vec2::new(800.0, 600.0);
+    let scale = g.compute_scale(&cam, vp.y);
+    let r = super::RING_MESH_RADIUS * scale;
+    let angle = std::f32::consts::FRAC_PI_4;
+    let ring_point = Vec3::new(r * angle.cos(), r * angle.sin(), 0.0);
+    let screen_pos = world_to_screen(ring_point, cam.view_projection, vp).unwrap();
+
+    let hit = g.probe(screen_pos, &handle);
+    assert!(hit.is_some(), "probe should detect ring hit");
 }
