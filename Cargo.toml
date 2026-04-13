@@ -10,6 +10,8 @@ repository = "https://github.com/playtron-os/ic3d"
 glam = "0.29"
 bytemuck = { version = "1.14", features = ["derive"] }
 earcutr = "0.4"
+parking_lot = "0.12"
+tracing = "0.1"
 
 [dependencies.iced]
 git = "https://github.com/playtron-os/iced.git"
@@ -30,6 +32,7 @@ vulkan = ["wgpu/vulkan"]
 [dev-dependencies]
 pollster = "0.4"
 bytemuck = "1.14"
+tracing-subscriber = "0.3"
 
 [lints.rust]
 unsafe_code = "forbid"
@@ -37,4 +40,16 @@ unsafe_code = "forbid"
 [[example]]
 name = "showcase"
 path = "examples/showcase.rs"
+
+[[example]]
+name = "gizmo"
+path = "examples/gizmo.rs"
+
+[[example]]
+name = "gizmo_manual"
+path = "examples/gizmo_manual.rs"
+
+[[example]]
+name = "showcase_advanced"
+path = "examples/showcase_advanced.rs"
 required-features = ["debug"]

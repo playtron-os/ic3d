@@ -1,10 +1,11 @@
 //! Directional light with orthographic shadow projection.
 
 use super::Light;
-use crate::gpu_types::{GpuLight, LIGHT_TYPE_DIRECTIONAL};
+use crate::pipeline::gpu_types::{GpuLight, LIGHT_TYPE_DIRECTIONAL};
 use glam::{Mat4, Vec3};
 
 /// Directional light. `direction` points FROM source TOWARD the scene.
+#[derive(Debug, Clone)]
 pub struct DirectionalLight {
     direction: Vec3,
     color: Vec3,

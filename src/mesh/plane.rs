@@ -1,7 +1,7 @@
 //! Flat quad primitive.
 
 use super::Mesh;
-use crate::gpu_types::Vertex;
+use crate::pipeline::gpu_types::Vertex;
 
 impl Mesh {
     /// Flat quad in the XZ plane, centered at the origin.

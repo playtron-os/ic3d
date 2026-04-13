@@ -48,6 +48,11 @@ One concept per file, grouped by folder (e.g., `camera/`, `light/`). When adding
 - `PointLight` — Position + range + color + intensity (omnidirectional).
 - `SpotLight` — Position + direction + inner/outer cone angles + range + color + intensity.
 - `Transform` — TRS → model + normal matrices → `InstanceData`.
+- `Gizmo` — 3D manipulation gizmo for CAD workflows. Translation mode with X/Y/Z axis handles. Produces `MeshDrawGroup`s for rendering and `GizmoResult` events for interaction.
+- `GizmoMode` — Enum: `Translate` (future: `Rotate`, `Scale`).
+- `GizmoAxis` — Enum: `X`, `Y`, `Z`.
+- `GizmoResult` — Enum: `Hover(GizmoAxis)`, `Translate(Vec3)`.
+- `Ray` — Screen-to-world ray casting with plane intersection and line closest-approach.
 - `Mesh` — CPU-side vertex data + primitive builders (cube, sphere, cylinder, cone, torus, plane). Use `mesh.upload(device)` to get a `MeshBuffer`.
 - `MeshBuffer` — Uploaded mesh: GPU vertex buffer + vertex count. Created via `Mesh::upload()`. Use with `pipeline.draw()` for the simplest render path.
 - `DynBuffer` — Auto-growing GPU buffer (2× growth strategy). Private `raw` field; use `.raw()` accessor or `.write()` convenience. Old buffers are retired to a `BufferPool` rather than dropped.
@@ -210,7 +215,42 @@ Call `pipeline.warmup()` after creation to avoid NVIDIA deferred shader compilat
 
 ### Widget API (High-Level)
 
-For most consumers, the `widget` module provides the simplest path — implement `Scene3DProgram` and call `scene_3d()`. Only `setup()` is required; the built-in Blinn-Phong shader handles lighting automatically:
+For most consumers, the **scene graph** is the simplest path — build a `SceneGraph` with camera, lights, materials, and meshes. It implements `Scene3DProgram` directly, so it plugs straight into `scene_3d()`:
+
+```rust
+use ic3d::graph::{SceneGraph, Material, AmbientLight};
+use ic3d::widget::scene_3d;
+use ic3d::{Mesh, PerspectiveCamera, DirectionalLight, SceneHandle};
+use ic3d::glam::Vec3;
+
+let mut graph = SceneGraph::new();
+
+// Materials, camera, lights
+let blue = graph.add_material(Material::new(Vec3::new(0.2, 0.6, 0.9)).with_shininess(64.0));
+let cam_id = graph.add_camera(PerspectiveCamera::new()
+    .position(Vec3::new(5.0, 5.0, 8.0))
+    .target(Vec3::ZERO)
+    .clip(0.1, 50.0));
+graph.add_light(DirectionalLight::new(
+    Vec3::new(-0.5, -1.0, -0.3), Vec3::ZERO, 20.0, 40.0));
+graph.add_light(AmbientLight::new(0.15));
+
+// Meshes with hierarchy
+let body = graph.add_mesh("body", Mesh::cube(1.0)).material(blue)
+    .position(Vec3::new(0.0, 1.0, 0.0)).id();
+let _arm = graph.add_mesh("arm", Mesh::cube(1.0)).material(blue)
+    .parent(body).position(Vec3::new(0.9, 0.3, 0.0)).id();
+
+// In view() — graph implements Scene3DProgram
+let handle = SceneHandle::new();
+scene_3d(graph.clone()).scene(handle.clone()).width(Length::Fill).height(Length::Fill)
+```
+
+Mutate the scene at runtime via `graph.node_mut(id)`, `graph.camera_mut::<PerspectiveCamera>(cam_id)`, and `graph.light_mut::<DirectionalLight>(sun_id)`.
+
+### Widget API (Advanced — Custom Scene3DProgram)
+
+For full control (custom fragment shaders, custom uniforms, manual instance transforms), implement `Scene3DProgram` directly:
 
 ```rust
 use ic3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
@@ -226,6 +266,7 @@ impl Scene3DProgram for MyScene {
         Scene3DSetup {
             scene,
             draws: vec![MeshDrawGroup::new(Mesh::cube(1.0), vec![instance])],
+            overlays: Vec::new(),
             custom_uniforms: None,
         }
     }
@@ -264,10 +305,18 @@ fn post_process_factory(&self) -> Option<PostProcessFactory> {
 
 The widget handles buffer creation, bind group layout, uploading, and passing to the render pipeline automatically.
 
-## Example
+## Examples
 
 ```bash
+# Scene graph — all primitives with orbiting camera and 3-point lighting
 cargo run --example showcase
-```
 
-Renders all built-in primitives (cube, sphere, cylinder, cone, torus, plane) with directional, point, and spot lights. Camera orbits automatically.
+# Translation gizmo — drag axes to move a cube (scene graph)
+cargo run --example gizmo
+
+# Custom overlay — scale gizmo built with DraggableOverlay (scene graph)
+cargo run --example gizmo_manual
+
+# Advanced — manual Scene3DProgram with debug shader modes (1-6 to switch)
+cargo run --example showcase_advanced --features debug
+```

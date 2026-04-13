@@ -50,3 +50,13 @@ fn shaders_blinn_phong_has_entry() {
 fn shaders_shadow_pcf_has_function() {
     assert!(SHADOW_PCF_WGSL.contains("sample_shadow_pcf"));
 }
+
+#[test]
+fn shaders_flat_color_non_empty() {
+    assert!(!FLAT_COLOR_WGSL.is_empty());
+}
+
+#[test]
+fn shaders_flat_color_has_entry() {
+    assert!(FLAT_COLOR_WGSL.contains("fs_main_flat"));
+}

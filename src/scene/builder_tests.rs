@@ -1,5 +1,5 @@
 use super::*;
-use crate::camera::OrthographicCamera;
+use crate::camera::{OrthographicCamera, PerspectiveCamera};
 use crate::light::DirectionalLight;
 use glam::Vec3;
 
@@ -109,7 +109,39 @@ fn scene_panics_on_too_many_lights() {
     let cam = OrthographicCamera::new();
     let sun = DirectionalLight::new(Vec3::new(0.0, -1.0, 0.0), Vec3::ZERO, 10.0, 20.0);
     let mut scene = Scene::new(&cam);
-    for _ in 0..=crate::gpu_types::MAX_LIGHTS {
+    for _ in 0..=crate::pipeline::gpu_types::MAX_LIGHTS {
         scene = scene.light(&sun);
     }
+}
+
+#[test]
+fn scene_camera_info_auto_derived() {
+    let cam = PerspectiveCamera::new().position(Vec3::new(0.0, 5.0, 10.0));
+    let data = Scene::new(&cam).build();
+    let pos = data.camera.position;
+    assert!((pos.x - 0.0).abs() < 1e-4);
+    assert!((pos.y - 5.0).abs() < 1e-4);
+    assert!((pos.z - 10.0).abs() < 1e-4);
+    assert!(data.camera.fov_y.is_some());
+}
+
+#[test]
+fn scene_camera_position_auto_derived_from_camera() {
+    let cam = PerspectiveCamera::new().position(Vec3::new(1.0, 2.0, 3.0));
+    let data = Scene::new(&cam).build();
+    assert_eq!(data.uniforms.camera_position, [1.0, 2.0, 3.0]);
+}
+
+#[test]
+fn scene_camera_position_override_takes_precedence() {
+    let cam = PerspectiveCamera::new().position(Vec3::new(1.0, 2.0, 3.0));
+    let data = Scene::new(&cam).camera_position([9.0, 8.0, 7.0]).build();
+    assert_eq!(data.uniforms.camera_position, [9.0, 8.0, 7.0]);
+}
+
+#[test]
+fn scene_ortho_camera_has_no_fov() {
+    let cam = OrthographicCamera::new();
+    let data = Scene::new(&cam).build();
+    assert!(data.camera.fov_y.is_none());
 }

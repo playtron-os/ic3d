@@ -1,11 +1,12 @@
 //! Main render pipeline — renders instanced 3D geometry with shadow mapping.
 
-use crate::buffer::{BufferPool, DynBuffer};
-use crate::gpu_types::{GpuLight, InstanceData, SceneUniforms, Vertex, MAX_LIGHTS};
 use crate::mesh::MeshBuffer;
-use crate::post_process::PostProcessPass;
-use crate::scene::SceneData;
-use crate::shadow::{DrawCall, ShadowPass};
+use crate::pipeline::buffer::{BufferPool, DynBuffer};
+use crate::pipeline::gpu_types::{GpuLight, InstanceData, SceneUniforms, Vertex, MAX_LIGHTS};
+use crate::pipeline::post_process::PostProcessPass;
+use crate::pipeline::shadow::{DrawCall, ShadowPass};
+use crate::pipeline::utils::compose_overlay_shader;
+use crate::scene::builder::SceneData;
 use bytemuck::Zeroable;
 use wgpu::util::DeviceExt;
 
@@ -55,6 +56,8 @@ impl<'a> PipelineConfig<'a> {
 pub struct RenderPipeline3D {
     // Main render
     main_pipeline: wgpu::RenderPipeline,
+    // Overlay render (depth always passes, no depth write)
+    overlay_pipeline: wgpu::RenderPipeline,
     // Kept alive — layout is referenced by the bind group
     _main_bind_group_layout: wgpu::BindGroupLayout,
     main_bind_group: wgpu::BindGroup,
@@ -63,6 +66,7 @@ pub struct RenderPipeline3D {
     uniform_buffer: wgpu::Buffer,
     light_buffer: wgpu::Buffer,
     instance_buffer: DynBuffer,
+    overlay_instance_buffer: DynBuffer,
 
     // Shadow
     shadow: ShadowPass,
@@ -117,6 +121,13 @@ impl RenderPipeline3D {
             device,
             "ic3d instances",
             std::mem::size_of::<InstanceData>() as u64 * 512,
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        );
+
+        let overlay_instance_buffer = DynBuffer::new(
+            device,
+            "ic3d overlay instances",
+            std::mem::size_of::<InstanceData>() as u64 * 64,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
 
@@ -254,13 +265,84 @@ impl RenderPipeline3D {
             cache: None,
         });
 
+        // Overlay pipeline — flat (unlit) shader, depth always passes (no depth write).
+        // Used for gizmos, grid lines, and other helpers that render on top of geometry.
+        let overlay_shader_src = compose_overlay_shader();
+        let overlay_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("ic3d overlay shader"),
+            source: wgpu::ShaderSource::Wgsl(overlay_shader_src.into()),
+        });
+
+        // Overlay pipeline layout: group 0 only (scene uniforms) — no custom bind group.
+        // The flat-color shader does not sample shadows or need group 1.
+        let overlay_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("ic3d overlay pipeline layout"),
+                bind_group_layouts: &[&main_bind_group_layout],
+                immediate_size: 0,
+            });
+
+        let overlay_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("ic3d overlay pipeline"),
+            layout: Some(&overlay_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &overlay_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::layout(), InstanceData::layout()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: msaa_samples,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &overlay_shader,
+                entry_point: Some("fs_main_flat"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: output_format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent {
+                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                        alpha: wgpu::BlendComponent {
+                            src_factor: wgpu::BlendFactor::One,
+                            dst_factor: wgpu::BlendFactor::One,
+                            operation: wgpu::BlendOperation::Max,
+                        },
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+
         Self {
             main_pipeline,
+            overlay_pipeline,
             _main_bind_group_layout: main_bind_group_layout,
             main_bind_group,
             uniform_buffer,
             light_buffer,
             instance_buffer,
+            overlay_instance_buffer,
             shadow,
             buffer_pool: BufferPool::new(),
             post_process_passes: Vec::new(),
@@ -534,6 +616,109 @@ impl RenderPipeline3D {
                 };
                 pp.render(encoder, source, dest);
             }
+        }
+    }
+
+    /// Upload overlay instance data for this frame.
+    ///
+    /// Overlays render on top of the scene with no depth testing (always visible).
+    /// Call this after [`prepare()`](Self::prepare) and before [`render_overlay()`](Self::render_overlay).
+    pub fn prepare_overlay(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        instances: &[InstanceData],
+    ) {
+        let needed = std::mem::size_of_val(instances) as u64;
+        self.overlay_instance_buffer
+            .ensure_capacity(device, &mut self.buffer_pool, needed);
+        queue.write_buffer(
+            self.overlay_instance_buffer.raw(),
+            0,
+            bytemuck::cast_slice(instances),
+        );
+    }
+
+    /// Build a [`DrawCall`] that uses the overlay instance buffer.
+    ///
+    /// Use with [`render_overlay()`](Self::render_overlay).
+    #[must_use]
+    pub fn draw_overlay<'a>(
+        &'a self,
+        mesh: &'a MeshBuffer,
+        instance_range: std::ops::Range<u32>,
+    ) -> DrawCall<'a> {
+        DrawCall {
+            vertex_buffer: mesh.buffer(),
+            instance_buffer: self.overlay_instance_buffer.raw(),
+            vertex_count: mesh.vertex_count(),
+            instance_range,
+        }
+    }
+
+    /// Render overlays on top of the already-rendered scene.
+    ///
+    /// Uses the overlay pipeline (depth compare = Always, no depth writes)
+    /// so overlays are never occluded by scene geometry. No shadow pass is
+    /// performed for overlays.
+    ///
+    /// Must be called **after** [`render()`](Self::render).
+    pub fn render_overlay(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        target: &wgpu::TextureView,
+        clip_bounds: (u32, u32, u32, u32),
+        draws: &[DrawCall<'_>],
+        custom_bind_group: Option<&wgpu::BindGroup>,
+    ) {
+        if draws.is_empty() {
+            return;
+        }
+
+        let use_msaa = self.msaa_samples > 1;
+        let (view, resolve): (&wgpu::TextureView, Option<&wgpu::TextureView>) = if use_msaa {
+            (&self.msaa_color_view, Some(target))
+        } else {
+            (target, None)
+        };
+
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("ic3d overlay pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                depth_slice: None,
+                resolve_target: resolve,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.msaa_depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Discard,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+
+        let (x, y, w, h) = clip_bounds;
+        pass.set_viewport(x as f32, y as f32, w as f32, h as f32, 0.0, 1.0);
+        pass.set_pipeline(&self.overlay_pipeline);
+        pass.set_bind_group(0, &self.main_bind_group, &[]);
+
+        if let Some(cbg) = custom_bind_group {
+            pass.set_bind_group(1, cbg, &[]);
+        }
+
+        for draw in draws {
+            pass.set_vertex_buffer(0, draw.vertex_buffer.slice(..));
+            pass.set_vertex_buffer(1, draw.instance_buffer.slice(..));
+            pass.draw(0..draw.vertex_count, draw.instance_range.clone());
         }
     }
 

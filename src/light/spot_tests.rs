@@ -1,5 +1,5 @@
 use super::*;
-use crate::gpu_types::LIGHT_TYPE_SPOT;
+use crate::pipeline::gpu_types::LIGHT_TYPE_SPOT;
 use glam::Vec3;
 
 #[test]

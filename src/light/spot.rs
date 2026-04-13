@@ -1,10 +1,11 @@
 //! Spot light — directional cone of light from a position.
 
 use super::Light;
-use crate::gpu_types::{GpuLight, LIGHT_TYPE_SPOT};
+use crate::pipeline::gpu_types::{GpuLight, LIGHT_TYPE_SPOT};
 use glam::Vec3;
 
 /// Spot light — emits a cone of light from a position along a direction.
+#[derive(Debug, Clone)]
 pub struct SpotLight {
     position: Vec3,
     direction: Vec3,

@@ -10,7 +10,7 @@ fn mesh_label() {
 
 #[test]
 fn mesh_custom() {
-    let v = crate::gpu_types::Vertex {
+    let v = crate::pipeline::gpu_types::Vertex {
         pos: [0.0, 0.0, 0.0],
         normal: [0.0, 1.0, 0.0],
         uv: [0.0, 0.0],

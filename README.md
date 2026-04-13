@@ -4,9 +4,53 @@ Lightweight 3D instanced rendering for [iced](https://iced.rs) applications. Sha
 
 ![ic3d showcase](docs/example.png)
 
-## Quick Start (Widget API)
+## Quick Start (Scene Graph)
 
-The simplest path — implement `Scene3DProgram` and call `scene_3d()`. The built-in Blinn-Phong shader handles lighting automatically:
+The simplest path — build a `SceneGraph` with camera, lights, materials, and meshes. It implements `Scene3DProgram` automatically:
+
+```rust
+use ic3d::graph::{SceneGraph, Material, AmbientLight};
+use ic3d::widget::scene_3d;
+use ic3d::{Mesh, PerspectiveCamera, DirectionalLight};
+use ic3d::glam::Vec3;
+
+let mut graph = SceneGraph::new();
+
+// Materials
+let red = graph.add_material(Material::new(Vec3::new(0.8, 0.2, 0.2)).with_shininess(64.0));
+
+// Camera
+graph.add_camera(PerspectiveCamera::new()
+    .position(Vec3::new(0.0, 2.0, 5.0))
+    .target(Vec3::ZERO)
+    .clip(0.1, 50.0));
+
+// Lights
+graph.add_light(DirectionalLight::new(
+    Vec3::new(-0.5, -1.0, -0.3).normalize(), Vec3::ZERO, 15.0, 30.0));
+graph.add_light(AmbientLight::new(0.15));
+
+// Meshes with hierarchy
+let body = graph.add_mesh("body", Mesh::cube(1.0))
+    .material(red)
+    .position(Vec3::new(0.0, 1.0, 0.0))
+    .id();
+let _arm = graph.add_mesh("arm", Mesh::cube(1.0))
+    .material(red)
+    .parent(body)
+    .position(Vec3::new(0.9, 0.3, 0.0))
+    .scale(Vec3::new(0.8, 0.2, 0.3))
+    .id();
+
+// In view() — graph implements Scene3DProgram directly:
+scene_3d(graph.clone()).width(Length::Fill).height(Length::Fill)
+```
+
+Mutate the scene at runtime via `graph.node_mut(id)` and `graph.camera_mut::<PerspectiveCamera>(cam_id)`.
+
+## Advanced: Custom Scene3DProgram
+
+For full control (custom fragment shaders, custom uniforms, manual instance transforms), implement `Scene3DProgram` directly:
 
 ```rust
 use ic3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
@@ -30,7 +74,7 @@ impl Scene3DProgram for MyScene {
             Mesh::cube(1.0),
             vec![Transform::new().to_instance([0.8, 0.2, 0.2, 64.0])],
         );
-        Scene3DSetup { scene, draws: vec![cube], custom_uniforms: None }
+        Scene3DSetup { scene, draws: vec![cube], overlays: vec![], custom_uniforms: None }
     }
 }
 
@@ -85,22 +129,21 @@ pipeline.render(encoder, target, bounds, &[
 
 `Mesh::cube`, `Mesh::sphere`, `Mesh::cylinder`, `Mesh::cone`, `Mesh::torus`, `Mesh::plane`, `Mesh::custom`
 
-## Example
+## Examples
 
 ```bash
+# Scene graph — all primitives with orbiting camera and 3-point lighting
 cargo run --example showcase
+
+# Translation gizmo — drag axes to move a cube (scene graph)
+cargo run --example gizmo
+
+# Custom overlay — scale gizmo built with DraggableOverlay (scene graph)
+cargo run --example gizmo_manual
+
+# Advanced — manual Scene3DProgram with debug shader modes (1-6 to switch)
+cargo run --example showcase_advanced --features debug
 ```
-
-Renders all built-in primitives on a ground plane with directional, point, and spot lights. Camera orbits automatically. Press **1-6** to cycle debug views:
-
-| Key | Mode | Shows |
-|-----|------|-------|
-| 1 | Lit | Full Blinn-Phong + shadows |
-| 2 | Normals | Surface normals as RGB |
-| 3 | NdotL | Primary light coverage |
-| 4 | Shadow | Shadow factor (green=lit, red=shadow) |
-| 5 | No-Shadow | Lighting without shadows |
-| 6 | Flat | Raw material colors |
 
 ## Dependencies
 

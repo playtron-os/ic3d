@@ -1,7 +1,7 @@
 //! Axis-aligned cube primitive.
 
 use super::Mesh;
-use crate::gpu_types::Vertex;
+use crate::pipeline::gpu_types::Vertex;
 
 impl Mesh {
     /// Axis-aligned cube centered at the origin.

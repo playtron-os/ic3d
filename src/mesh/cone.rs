@@ -1,7 +1,7 @@
 //! Cone primitive.
 
 use super::Mesh;
-use crate::gpu_types::Vertex;
+use crate::pipeline::gpu_types::Vertex;
 use std::f32::consts::PI;
 
 impl Mesh {

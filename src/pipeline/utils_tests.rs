@@ -1,4 +1,4 @@
-use super::compose_shader;
+use super::{compose_overlay_shader, compose_shader};
 
 #[test]
 fn compose_shader_includes_preludes() {
@@ -23,4 +23,20 @@ fn compose_shader_non_empty() {
     let result = compose_shader("");
     // Even with empty fragment, preludes should be present
     assert!(result.len() > 100);
+}
+
+#[test]
+fn compose_overlay_shader_includes_preludes() {
+    let result = compose_overlay_shader();
+    assert!(result.contains("SceneUniforms"));
+    assert!(result.contains("VertexIn"));
+    assert!(result.contains("vs_main"));
+    assert!(result.contains("fs_main_flat"));
+}
+
+#[test]
+fn compose_overlay_shader_no_shadow_pcf() {
+    let result = compose_overlay_shader();
+    // Flat shader should NOT include shadow sampling
+    assert!(!result.contains("sample_shadow_pcf"));
 }

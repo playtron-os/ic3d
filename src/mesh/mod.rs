@@ -1,15 +1,18 @@
-//! Mesh data and primitive geometry builders.
+//! Mesh data, primitive geometry builders, and SVG path parsing.
 
+mod arrow;
 mod cone;
 mod cube;
 mod cylinder;
 mod plane;
 mod sphere;
+pub mod svg;
 mod torus;
 
-use crate::gpu_types::Vertex;
+use crate::pipeline::gpu_types::Vertex;
 
 /// A CPU-side mesh: a named list of vertices (triangle list topology).
+#[derive(Debug, Clone)]
 pub struct Mesh {
     vertices: Vec<Vertex>,
     label: String,
@@ -276,6 +279,9 @@ impl MeshBuilder {
     /// Unlike [`extrude`](Self::extrude) (which uses fan triangulation for
     /// convex shapes only), this works with any simple polygon.
     ///
+    /// If triangulation fails (degenerate polygon), a warning is logged and
+    /// the builder is returned unchanged (no faces added).
+    ///
     /// Does **not** add side walls — chain with
     /// [`extrude_walls`](Self::extrude_walls) for a full extruded shape.
     ///
@@ -292,7 +298,13 @@ impl MeshBuilder {
             .iter()
             .flat_map(|p| [f64::from(p[0]), f64::from(p[1])])
             .collect();
-        let indices = earcutr::earcut(&coords, &[], 2).expect("earcut failed");
+        let indices = match earcutr::earcut(&coords, &[], 2) {
+            Ok(idx) => idx,
+            Err(e) => {
+                tracing::warn!("earcut triangulation failed: {e}");
+                return self;
+            }
+        };
         for chunk in indices.chunks(3) {
             let (i0, i1, i2) = (chunk[0], chunk[1], chunk[2]);
             self = self.triangle(
@@ -308,6 +320,9 @@ impl MeshBuilder {
     ///
     /// `outer` is the outer boundary ring. `holes` is a slice of inner hole
     /// rings that will be subtracted. Uses earcut for triangulation.
+    ///
+    /// If triangulation fails (degenerate polygon), a warning is logged and
+    /// the builder is returned unchanged (no faces added).
     ///
     /// Does **not** add side walls — chain with
     /// [`extrude_walls`](Self::extrude_walls) for each ring.
@@ -341,7 +356,13 @@ impl MeshBuilder {
                 coords.push(f64::from(pt[1]));
             }
         }
-        let indices = earcutr::earcut(&coords, &hole_indices, 2).expect("earcut with holes failed");
+        let indices = match earcutr::earcut(&coords, &hole_indices, 2) {
+            Ok(idx) => idx,
+            Err(e) => {
+                tracing::warn!("earcut triangulation with holes failed: {e}");
+                return self;
+            }
+        };
         for chunk in indices.chunks(3) {
             let (i0, i1, i2) = (chunk[0], chunk[1], chunk[2]);
             self = self.triangle(

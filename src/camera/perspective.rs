@@ -4,6 +4,7 @@ use super::Camera;
 use glam::{Mat4, Vec3};
 
 /// Perspective camera — realistic projection with depth foreshortening.
+#[derive(Debug, Clone)]
 pub struct PerspectiveCamera {
     position: Vec3,
     target: Vec3,
@@ -68,6 +69,40 @@ impl PerspectiveCamera {
         self.far = far;
         self
     }
+
+    // ──── Runtime mutators ────
+
+    /// Set the camera position (for runtime updates).
+    pub fn set_position(&mut self, pos: Vec3) {
+        self.position = pos;
+    }
+
+    /// Set the look-at target (for runtime updates).
+    pub fn set_target(&mut self, target: Vec3) {
+        self.target = target;
+    }
+
+    /// Set the vertical field of view in radians (for runtime updates).
+    pub fn set_fov(&mut self, fov_y: f32) {
+        self.fov_y = fov_y;
+    }
+
+    /// Set the aspect ratio (for runtime updates).
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
+    }
+
+    /// Set the near and far clip planes (for runtime updates).
+    pub fn set_clip(&mut self, near: f32, far: f32) {
+        self.near = near;
+        self.far = far;
+    }
+
+    /// The look-at target point.
+    #[must_use]
+    pub fn camera_target(&self) -> Vec3 {
+        self.target
+    }
 }
 
 impl Default for PerspectiveCamera {
@@ -83,6 +118,26 @@ impl Camera for PerspectiveCamera {
 
     fn projection_matrix(&self) -> Mat4 {
         Mat4::perspective_rh(self.fov_y, self.aspect, self.near, self.far)
+    }
+
+    fn camera_position(&self) -> Vec3 {
+        self.position
+    }
+
+    fn camera_forward(&self) -> Vec3 {
+        (self.target - self.position).normalize()
+    }
+
+    fn fov_y(&self) -> Option<f32> {
+        Some(self.fov_y)
+    }
+
+    fn camera_target(&self) -> Vec3 {
+        self.target
+    }
+
+    fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
     }
 }
 

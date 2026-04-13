@@ -1,8 +1,8 @@
 //! Scene composition: camera + lights → [`SceneUniforms`] + [`GpuLight`] array.
 
-use crate::camera::Camera;
-use crate::gpu_types::{GpuLight, SceneUniforms, MAX_LIGHTS};
+use crate::camera::{Camera, CameraInfo};
 use crate::light::Light;
+use crate::pipeline::gpu_types::{GpuLight, SceneUniforms, MAX_LIGHTS};
 use bytemuck::Zeroable;
 
 /// Scene output: uniforms + light array ready for GPU upload.
@@ -10,12 +10,16 @@ use bytemuck::Zeroable;
 pub struct SceneData {
     pub uniforms: SceneUniforms,
     pub lights: Vec<GpuLight>,
+    /// Camera metadata for overlay/gizmo scaling.
+    ///
+    /// Auto-populated from the camera passed to [`Scene::new`].
+    pub camera: CameraInfo,
 }
 
 /// Composes camera and lights into GPU-ready data.
 pub struct Scene<'a> {
     camera: &'a dyn Camera,
-    camera_position: [f32; 3],
+    camera_position: Option<[f32; 3]>,
     lights: [GpuLight; MAX_LIGHTS],
     light_count: usize,
     time: f32,
@@ -29,7 +33,7 @@ impl<'a> Scene<'a> {
     pub fn new(camera: &'a dyn Camera) -> Self {
         Self {
             camera,
-            camera_position: [0.0; 3],
+            camera_position: None,
             lights: [GpuLight::zeroed(); MAX_LIGHTS],
             light_count: 0,
             time: 0.0,
@@ -39,10 +43,13 @@ impl<'a> Scene<'a> {
         }
     }
 
-    /// Set camera world-space position (for specular/Fresnel).
+    /// Override camera world-space position (for specular/Fresnel in the GPU uniform).
+    ///
+    /// If not called, the position is derived automatically from
+    /// [`Camera::camera_position`].
     #[must_use]
     pub fn camera_position(mut self, pos: [f32; 3]) -> Self {
-        self.camera_position = pos;
+        self.camera_position = Some(pos);
         self
     }
 
@@ -56,6 +63,20 @@ impl<'a> Scene<'a> {
             "ic3d: exceeded MAX_LIGHTS ({MAX_LIGHTS})"
         );
         self.lights[self.light_count] = light.to_gpu_light();
+        self.light_count += 1;
+        self
+    }
+
+    /// Add a pre-built [`GpuLight`] directly.
+    ///
+    /// Panics if more than [`MAX_LIGHTS`] are added.
+    #[must_use]
+    pub fn gpu_light(mut self, gpu: GpuLight) -> Self {
+        assert!(
+            self.light_count < MAX_LIGHTS,
+            "ic3d: exceeded MAX_LIGHTS ({MAX_LIGHTS})"
+        );
+        self.lights[self.light_count] = gpu;
         self.light_count += 1;
         self
     }
@@ -93,9 +114,13 @@ impl<'a> Scene<'a> {
     /// Produce GPU-ready scene data (uniforms + light array).
     #[must_use]
     pub fn build(&self) -> SceneData {
+        let cam_pos = self
+            .camera_position
+            .unwrap_or_else(|| self.camera.camera_position().to_array());
+
         let uniforms = SceneUniforms {
             view_projection: self.camera.view_projection().to_cols_array_2d(),
-            camera_position: self.camera_position,
+            camera_position: cam_pos,
             time: self.time,
             screen_size: self.screen_size,
             light_count: self.light_count as u32,
@@ -107,10 +132,11 @@ impl<'a> Scene<'a> {
         SceneData {
             uniforms,
             lights: self.lights[..self.light_count].to_vec(),
+            camera: CameraInfo::from_camera(self.camera),
         }
     }
 }
 
 #[cfg(test)]
-#[path = "scene_tests.rs"]
+#[path = "builder_tests.rs"]
 mod tests;

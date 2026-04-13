@@ -4,6 +4,7 @@ use super::Camera;
 use glam::{Mat4, Vec3};
 
 /// Orthographic camera — parallel projection, no foreshortening.
+#[derive(Debug, Clone)]
 pub struct OrthographicCamera {
     position: Vec3,
     target: Vec3,
@@ -63,6 +64,30 @@ impl OrthographicCamera {
         self
     }
 
+    // ──── Runtime mutators ────
+
+    /// Set the camera position (for runtime updates).
+    pub fn set_position(&mut self, pos: Vec3) {
+        self.position = pos;
+    }
+
+    /// Set the look-at target (for runtime updates).
+    pub fn set_target(&mut self, target: Vec3) {
+        self.target = target;
+    }
+
+    /// Set the near and far clip planes (for runtime updates).
+    pub fn set_clip(&mut self, near: f32, far: f32) {
+        self.near = near;
+        self.far = far;
+    }
+
+    /// The look-at target point.
+    #[must_use]
+    pub fn camera_target(&self) -> Vec3 {
+        self.target
+    }
+
     /// Convert a screen-space pixel position to a world-space point on the
     /// camera's near plane.
     ///
@@ -101,6 +126,18 @@ impl Camera for OrthographicCamera {
             self.near,
             self.far,
         )
+    }
+
+    fn camera_position(&self) -> Vec3 {
+        self.position
+    }
+
+    fn camera_forward(&self) -> Vec3 {
+        (self.target - self.position).normalize()
+    }
+
+    fn camera_target(&self) -> Vec3 {
+        self.target
     }
 }
 

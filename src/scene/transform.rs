@@ -2,9 +2,10 @@
 
 use glam::{Mat3, Mat4, Quat, Vec3};
 
-use crate::gpu_types::InstanceData;
+use crate::pipeline::gpu_types::InstanceData;
 
 /// TRS transform. `Model = Translate × Rotate × Scale`.
+#[derive(Debug, Clone)]
 pub struct Transform {
     /// World-space position.
     pub position: Vec3,

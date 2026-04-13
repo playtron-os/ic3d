@@ -26,6 +26,7 @@
 //!         Scene3DSetup {
 //!             scene,
 //!             draws,
+//!             overlays: vec![],
 //!             custom_uniforms: Some(debug::uniforms(self.mode)),
 //!         }
 //!     }
@@ -33,7 +34,7 @@
 //! ```
 
 /// Debug Blinn-Phong fragment shader source (WGSL).
-pub const FRAGMENT_WGSL: &str = include_str!("../shaders/debug_blinn_phong.wgsl");
+pub const FRAGMENT_WGSL: &str = include_str!("../../shaders/debug_blinn_phong.wgsl");
 
 /// Size in bytes of the debug uniform buffer (`@group(1) @binding(0)`).
 ///

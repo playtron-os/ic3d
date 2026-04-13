@@ -8,43 +8,79 @@
 //! - Group 0 (engine): `SceneUniforms` + light storage + shadow map + sampler
 //! - Group 1 (consumer): optional custom uniforms
 
-mod buffer;
 mod camera;
-mod custom_uniforms;
-#[cfg(feature = "debug")]
-pub mod debug;
-mod gpu_types;
+pub mod gizmo;
+pub mod graph;
 mod light;
 pub mod math;
 mod mesh;
+mod overlay;
 mod pipeline;
-mod post_process;
 mod scene;
-mod shaders;
-mod shadow;
-pub mod svg;
-mod transform;
-mod utils;
 pub mod widget;
 
-pub use buffer::{BufferPool, DynBuffer};
-pub use camera::{Camera, OrthographicCamera, PerspectiveCamera};
-pub use custom_uniforms::CustomUniformBuffer;
-pub use gpu_types::{
+// ── Re-exports: camera ──
+pub use camera::{Camera, CameraInfo, OrthographicCamera, PerspectiveCamera};
+
+// ── Re-exports: light ──
+pub use light::{DirectionalLight, Light, PointLight, SpotLight};
+
+// ── Re-exports: mesh ──
+pub use mesh::svg;
+pub use mesh::{Mesh, MeshBuffer, MeshBuilder};
+
+// ── Re-exports: transform ──
+pub use scene::transform::Transform;
+
+// ── Re-exports: scene ──
+pub use scene::builder::{Scene, SceneData};
+pub use scene::context::{SceneContext, SceneHandle};
+pub use scene::object::SceneObjectId;
+
+// ── Re-exports: overlay ──
+pub use overlay::base::{Overlay, OverlayContext, OverlayEvent, OverlayInput};
+pub use overlay::draggable::{DragState, Draggable, DraggableOverlay};
+
+// ── Re-exports: pipeline ──
+pub use pipeline::buffer::{BufferPool, DynBuffer};
+pub use pipeline::custom_uniforms::CustomUniformBuffer;
+pub use pipeline::gpu_types::{
     GpuLight, InstanceData, SceneUniforms, Vertex, LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT,
     LIGHT_TYPE_SPOT, MAX_LIGHTS,
 };
-pub use light::{DirectionalLight, Light, PointLight, SpotLight};
-pub use mesh::{Mesh, MeshBuffer, MeshBuilder};
-pub use pipeline::{PipelineConfig, RenderPipeline3D};
-pub use post_process::PostProcessPass;
-pub use scene::{Scene, SceneData};
-pub use shaders::{
+pub use pipeline::post_process::PostProcessPass;
+pub use pipeline::render_pipeline::{PipelineConfig, RenderPipeline3D};
+pub use pipeline::shaders::{
     BLINN_PHONG_WGSL, SCENE_UNIFORMS_WGSL, SHADOW_PCF_WGSL, STANDARD_VS_WGSL, VERTEX_IO_WGSL,
 };
-pub use shadow::{DrawCall, ShadowPass};
-pub use transform::Transform;
-pub use utils::compose_shader;
+pub use pipeline::shadow::{DrawCall, ShadowPass};
+pub use pipeline::utils::compose_shader;
+
+// ── Re-exports: debug (feature-gated) ──
+#[cfg(feature = "debug")]
+pub use pipeline::debug;
+
+/// Convenience subscription that fires once per rendered frame.
+///
+/// Pair with [`graph::SceneGraph::tick`] for frame-accurate delta time:
+///
+/// ```rust,ignore
+/// fn subscription(&self) -> Subscription<Message> {
+///     ic3d::frames().map(|_| Message::Tick)
+/// }
+///
+/// fn update(&mut self, message: Message) {
+///     match message {
+///         Message::Tick => {
+///             let dt = self.graph.tick();
+///             // animate using dt and self.graph.elapsed()
+///         }
+///     }
+/// }
+/// ```
+pub fn frames() -> iced::Subscription<()> {
+    iced::window::frames().map(|_| ())
+}
 
 /// Re-exported for consumer convenience — no need to add `glam` as a separate dependency.
 pub use glam;

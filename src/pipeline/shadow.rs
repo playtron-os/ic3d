@@ -1,6 +1,6 @@
 //! Shadow map pass — depth-only render from the light's perspective.
 
-use crate::gpu_types::{InstanceData, Vertex};
+use crate::pipeline::gpu_types::{InstanceData, Vertex};
 
 /// Shadow map resolution and GPU resources.
 pub struct ShadowPass {
@@ -85,7 +85,7 @@ impl ShadowPass {
         // Shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("ic3d shadow shader"),
-            source: wgpu::ShaderSource::Wgsl(crate::shaders::SHADOW_WGSL.into()),
+            source: wgpu::ShaderSource::Wgsl(crate::pipeline::shaders::SHADOW_WGSL.into()),
         });
 
         // Depth-only pipeline

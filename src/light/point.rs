@@ -1,10 +1,11 @@
 //! Point light — omnidirectional light emitting from a position.
 
 use super::Light;
-use crate::gpu_types::{GpuLight, LIGHT_TYPE_POINT};
+use crate::pipeline::gpu_types::{GpuLight, LIGHT_TYPE_POINT};
 use glam::Vec3;
 
 /// Point light — emits light equally in all directions from a position.
+#[derive(Debug, Clone)]
 pub struct PointLight {
     position: Vec3,
     color: Vec3,
