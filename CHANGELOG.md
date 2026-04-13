@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/playtron-os/ic3d/compare/v1.2.0...v1.3.0) (2026-04-13)
+
+
+### Features
+
+* MeshGizmo trait, rotation gizmo, InteractiveOverlay ([9b01602](https://github.com/playtron-os/ic3d/commit/9b016025b16af71d0afc36c72bfc55dd9bd643ed))
+
 # [1.2.0](https://github.com/playtron-os/ic3d/compare/v1.1.0...v1.2.0) (2026-04-13)
 
 
