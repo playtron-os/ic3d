@@ -3,6 +3,7 @@
 Lightweight 3D instanced rendering for [iced](https://iced.rs) applications. Shadow mapping, configurable MSAA, camera/light/mesh abstractions, and reusable WGSL shader preludes. Consumers write only a fragment shader.
 
 ![ic3d showcase](docs/example.png)
+![crystal field](docs/crystals.png)
 
 ## Quick Start (Scene Graph)
 
@@ -140,6 +141,12 @@ cargo run --example gizmo
 
 # Custom overlay — scale gizmo built with DraggableOverlay (scene graph)
 cargo run --example gizmo_manual
+
+# Custom shader — iridescent crystal hex columns with energy veins
+cargo run --example crystal
+
+# Transparent window — floating 3D meshes on the desktop
+cargo run --example transparent
 
 # Advanced — manual Scene3DProgram with debug shader modes (1-6 to switch)
 cargo run --example showcase_advanced --features debug
