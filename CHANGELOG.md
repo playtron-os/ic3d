@@ -1,3 +1,11 @@
+# [1.2.0](https://github.com/playtron-os/ic3d/compare/v1.1.0...v1.2.0) (2026-04-13)
+
+
+### Features
+
+* major architecture refactor and overlay/gizmo implementation ([e4b05f8](https://github.com/playtron-os/ic3d/commit/e4b05f8cee5dab8b2bd27b8970f3dcf58e799098))
+* per-frame clear_color, math utils, gizmo unhover, crystal & transparent examples ([85a7479](https://github.com/playtron-os/ic3d/commit/85a74792ccf09f1ea58b807766897b82067430d9))
+
 # [1.1.0](https://github.com/playtron-os/ic3d/compare/v1.0.1...v1.1.0) (2026-04-07)
 
 
