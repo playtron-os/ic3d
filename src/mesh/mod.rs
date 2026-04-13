@@ -4,6 +4,7 @@ mod arrow;
 mod cone;
 mod cube;
 mod cylinder;
+mod hex_column;
 mod plane;
 mod sphere;
 pub mod svg;
@@ -235,11 +236,12 @@ impl MeshBuilder {
             self = self.triangle(top[0], top[i], top[i + 1]);
         }
 
-        // Side walls: one quad per edge
+        // Side walls: one quad per edge, wound so normals face outward.
+        // (bot→top order matches extrude_walls for consistency.)
         let n = top.len();
         for i in 0..n {
             let j = (i + 1) % n;
-            self = self.quad(top[i], top[j], bot[j], bot[i]);
+            self = self.quad(bot[i], bot[j], top[j], top[i]);
         }
 
         self

@@ -37,6 +37,8 @@ pub(crate) struct Scene3DPrimitive {
     /// Overlay groups resolved from `Overlay::draw()` during widget `draw()`.
     pub(super) overlay_groups: Vec<MeshDrawGroup>,
     pub(super) custom_uniforms: Option<Vec<u8>>,
+    /// Pipeline clear color for this frame.
+    pub(super) clear_color: wgpu::Color,
     /// Type name of the program, for Debug impl.
     pub(super) program_name: &'static str,
 }
@@ -71,6 +73,7 @@ impl shader::Primitive for Scene3DPrimitive {
             all_instances.extend_from_slice(&draw.instances);
         }
 
+        pipeline.renderer.set_clear_color(self.clear_color);
         pipeline.renderer.prepare(
             device,
             queue,

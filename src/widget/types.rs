@@ -86,6 +86,12 @@ pub struct Scene3DSetup {
     /// The bytes must match your WGSL struct exactly (use `bytemuck::bytes_of`).
     /// Set to `None` if you don't use custom uniforms.
     pub custom_uniforms: Option<Vec<u8>>,
+    /// Pipeline clear color. Default: opaque black.
+    ///
+    /// Set to [`wgpu::Color::TRANSPARENT`] to render 3D objects as transparent
+    /// overlays (e.g. floating widgets on a desktop). With premultiplied alpha
+    /// compositing, only geometry pixels will be visible.
+    pub clear_color: wgpu::Color,
 }
 
 /// Implement this trait to define a 3D scene.

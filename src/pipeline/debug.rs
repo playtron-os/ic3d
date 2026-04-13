@@ -28,6 +28,7 @@
 //!             draws,
 //!             overlays: vec![],
 //!             custom_uniforms: Some(debug::uniforms(self.mode)),
+//!             clear_color: wgpu::Color::BLACK,
 //!         }
 //!     }
 //! }

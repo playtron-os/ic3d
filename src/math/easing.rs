@@ -40,6 +40,25 @@ pub fn ease_out_cubic(t: f32) -> f32 {
     1.0 - (1.0 - t).powi(3)
 }
 
+/// Elastic ease-out: dramatic overshoot with spring-like oscillation.
+///
+/// Quickly reaches 1.0 then oscillates around it with exponentially
+/// decaying amplitude. Good for pop-in and reveal animations.
+/// Output is clamped to `[0.0, 1.2]`.
+#[must_use]
+pub fn ease_out_elastic(t: f32) -> f32 {
+    if t <= 0.0 {
+        return 0.0;
+    }
+    if t >= 1.0 {
+        return 1.0;
+    }
+    let p = 0.35;
+    let s = p / 4.0;
+    (2.0_f32.powf(-10.0 * t) * ((t - s) * (2.0 * std::f32::consts::PI / p)).sin() + 1.0)
+        .clamp(0.0, 1.2)
+}
+
 #[cfg(test)]
 #[path = "easing_tests.rs"]
 mod tests;

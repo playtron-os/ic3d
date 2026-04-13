@@ -353,11 +353,11 @@ impl RenderPipeline3D {
             msaa_size: (1, 1),
             msaa_samples,
             output_format,
-            clear_color: wgpu::Color::TRANSPARENT,
+            clear_color: wgpu::Color::BLACK,
         }
     }
 
-    /// Set the background clear color (default: transparent).
+    /// Set the background clear color (default: opaque black).
     pub fn set_clear_color(&mut self, color: wgpu::Color) {
         self.clear_color = color;
     }

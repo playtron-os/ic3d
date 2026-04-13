@@ -129,6 +129,7 @@ impl<'a> OverlayContext<'a> {
 ///     draws: vec![/* ... */],
 ///     overlays: vec![Box::new(gizmo.clone())],
 ///     custom_uniforms: None,
+///     clear_color: wgpu::Color::BLACK,
 /// }
 /// ```
 pub trait Overlay: fmt::Debug + Send + Sync {

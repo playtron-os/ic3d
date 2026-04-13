@@ -15,14 +15,18 @@
 //! ```
 
 pub mod curve;
+pub mod distance;
 pub mod easing;
 pub mod hash;
+pub mod hex_grid;
 pub mod interp;
 pub mod ray;
 pub mod screen;
 
 pub use curve::*;
+pub use distance::*;
 pub use easing::*;
 pub use hash::*;
+pub use hex_grid::*;
 pub use interp::*;
 pub use screen::*;

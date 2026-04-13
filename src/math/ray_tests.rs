@@ -78,3 +78,100 @@ fn from_screen_center() {
         ray.direction
     );
 }
+
+// ── intersect_disk ──
+
+#[test]
+fn intersect_disk_hit() {
+    // Ray along -Y hitting a horizontal disk at y=0, center (0,0,0), radius 1
+    let ray = Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::NEG_Y);
+    let t = ray.intersect_disk(Vec3::ZERO, Vec3::Y, 1.0);
+    assert!((t.unwrap() - 5.0).abs() < 1e-6);
+}
+
+#[test]
+fn intersect_disk_miss_outside_radius() {
+    // Ray along -Y but offset so it hits the plane outside the disk
+    let ray = Ray::new(Vec3::new(2.0, 5.0, 0.0), Vec3::NEG_Y);
+    let t = ray.intersect_disk(Vec3::ZERO, Vec3::Y, 1.0);
+    assert!(t.is_none(), "should miss disk when outside radius");
+}
+
+#[test]
+fn intersect_disk_edge() {
+    // Ray hits exactly at the edge of the disk
+    let ray = Ray::new(Vec3::new(1.0, 5.0, 0.0), Vec3::NEG_Y);
+    let t = ray.intersect_disk(Vec3::ZERO, Vec3::Y, 1.0);
+    assert!(t.is_some(), "should hit at edge of disk");
+}
+
+#[test]
+fn intersect_disk_behind_ray() {
+    // Disk is behind the ray origin
+    let ray = Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::Y); // pointing away
+    let t = ray.intersect_disk(Vec3::ZERO, Vec3::Y, 1.0);
+    assert!(t.is_none(), "should not hit disk behind ray");
+}
+
+#[test]
+fn intersect_disk_parallel() {
+    // Ray parallel to disk plane
+    let ray = Ray::new(Vec3::new(0.0, 1.0, 0.0), Vec3::X);
+    let t = ray.intersect_disk(Vec3::ZERO, Vec3::Y, 1.0);
+    assert!(t.is_none(), "parallel ray should miss");
+}
+
+#[test]
+fn intersect_disk_at_height() {
+    // Disk at y=3 — simulating a column top
+    let ray = Ray::new(Vec3::new(0.5, 10.0, 0.5), Vec3::NEG_Y);
+    let center = Vec3::new(0.5, 3.0, 0.5);
+    let t = ray.intersect_disk(center, Vec3::Y, 0.55);
+    assert!(t.is_some(), "should hit column top disk");
+    assert!((t.unwrap() - 7.0).abs() < 1e-6);
+}
+
+// ── intersect_sphere ──
+
+#[test]
+fn intersect_sphere_hit() {
+    // Ray along +X hitting unit sphere at origin
+    let ray = Ray::new(Vec3::new(-5.0, 0.0, 0.0), Vec3::X);
+    let t = ray.intersect_sphere(Vec3::ZERO, 1.0);
+    assert!((t.unwrap() - 4.0).abs() < 1e-6, "should hit at t=4 (enter)");
+}
+
+#[test]
+fn intersect_sphere_miss() {
+    // Ray above sphere
+    let ray = Ray::new(Vec3::new(-5.0, 2.0, 0.0), Vec3::X);
+    let t = ray.intersect_sphere(Vec3::ZERO, 1.0);
+    assert!(t.is_none(), "should miss sphere");
+}
+
+#[test]
+fn intersect_sphere_inside() {
+    // Ray origin inside sphere — should return far intersection
+    let ray = Ray::new(Vec3::ZERO, Vec3::X);
+    let t = ray.intersect_sphere(Vec3::ZERO, 1.0);
+    assert!(t.is_some(), "should hit from inside");
+    assert!((t.unwrap() - 1.0).abs() < 1e-6, "far intersection at t=1");
+}
+
+#[test]
+fn intersect_sphere_behind() {
+    // Sphere is behind the ray
+    let ray = Ray::new(Vec3::new(5.0, 0.0, 0.0), Vec3::X);
+    let t = ray.intersect_sphere(Vec3::ZERO, 1.0);
+    assert!(t.is_none(), "sphere behind ray");
+}
+
+#[test]
+fn intersect_sphere_tangent() {
+    // Ray tangent to unit sphere at (0, 1, 0)
+    let ray = Ray::new(Vec3::new(-5.0, 1.0, 0.0), Vec3::X);
+    let t = ray.intersect_sphere(Vec3::ZERO, 1.0);
+    // Tangent → discriminant ~ 0, should still count as a hit
+    assert!(t.is_some(), "tangent should hit");
+    assert!((t.unwrap() - 5.0).abs() < 1e-4);
+}

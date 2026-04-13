@@ -53,3 +53,16 @@ path = "examples/gizmo_manual.rs"
 name = "showcase_advanced"
 path = "examples/showcase_advanced.rs"
 required-features = ["debug"]
+
+[[example]]
+name = "crystal"
+path = "examples/crystal.rs"
+
+[[example]]
+name = "transparent"
+path = "examples/transparent.rs"
+
+#[patch."https://github.com/playtron-os/iced.git"]
+#iced = { path = "../iced" }
+#iced_wgpu = { path = "../iced/wgpu" }
+#iced_winit = { path = "../iced/winit" }

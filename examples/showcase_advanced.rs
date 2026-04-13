@@ -268,6 +268,7 @@ impl Scene3DProgram for AdvancedScene {
             draws,
             overlays: vec![],
             custom_uniforms: Some(debug::uniforms(self.debug_mode)),
+            clear_color: wgpu::Color::BLACK,
         }
     }
 }

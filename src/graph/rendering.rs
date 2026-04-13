@@ -125,6 +125,7 @@ impl SceneGraph {
                 .map(|o| -> Box<dyn Overlay> { o.clone_overlay() })
                 .collect(),
             custom_uniforms: None,
+            clear_color: wgpu::Color::BLACK,
         }
     }
 }

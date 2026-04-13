@@ -2,6 +2,8 @@
 
 use glam::{Mat4, Vec2, Vec3};
 
+use super::ray::Ray;
+
 /// Project a world-space point to screen-space pixels.
 ///
 /// Returns `None` if the point is behind the camera (clip `w ≤ 0`).
@@ -206,6 +208,44 @@ pub fn screen_hit_test(
             (dist < threshold_px).then_some(dist)
         }
     }
+}
+
+/// Unproject a screen-space cursor position onto the XZ ground plane (Y = `height`).
+///
+/// Casts a ray from the camera through the cursor and intersects with the
+/// horizontal plane at the given Y height. Returns the world-space XZ
+/// coordinates, or `None` if the camera is looking away from the plane
+/// (ray parallel or pointing upward).
+///
+/// - `cursor`: screen-space cursor position in pixels (top-left origin)
+/// - `viewport`: viewport size in logical pixels `(width, height)`
+/// - `inv_view_proj`: inverse of the combined view-projection matrix
+/// - `height`: Y-level of the ground plane (typically `0.0`)
+///
+/// ```rust,ignore
+/// use ic3d::math::screen_to_ground;
+/// use ic3d::glam::{Mat4, Vec2};
+///
+/// let inv_vp = (proj * view).inverse();
+/// if let Some(pos) = screen_to_ground(cursor, viewport, inv_vp, 0.0) {
+///     println!("cursor at world ({:.1}, {:.1})", pos.x, pos.y);
+/// }
+/// ```
+#[must_use]
+pub fn screen_to_ground(
+    cursor: Vec2,
+    viewport: Vec2,
+    inv_view_proj: Mat4,
+    height: f32,
+) -> Option<Vec2> {
+    let ray = Ray::from_screen(cursor, viewport, inv_view_proj);
+    let t = ray.intersect_plane(Vec3::Y, Vec3::new(0.0, height, 0.0))?;
+    // Only accept forward intersections
+    if t < 0.0 {
+        return None;
+    }
+    let hit = ray.point_at(t);
+    Some(Vec2::new(hit.x, hit.z))
 }
 
 #[cfg(test)]

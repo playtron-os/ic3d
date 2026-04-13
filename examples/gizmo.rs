@@ -99,6 +99,9 @@ impl App {
                 GizmoResult::Hover(axis) => {
                     self.status = format!("Hovering: {axis:?} axis");
                 }
+                GizmoResult::Unhover => {
+                    self.status = "Hover over an axis arrow and drag to move the cube".into();
+                }
                 GizmoResult::Translate(delta) => {
                     if let Some(node) = self.graph.node_mut(self.cube_id) {
                         let pos = node.local_transform().position + delta;

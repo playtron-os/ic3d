@@ -98,6 +98,69 @@ impl Ray {
         (t_ray, t_line)
     }
 
+    /// Intersect with a disk — a circle in 3D defined by a center, normal,
+    /// and radius.
+    ///
+    /// Returns the `t` parameter if the ray hits the disk (forward only,
+    /// `t >= 0`), or `None` if the ray misses or is parallel.
+    ///
+    /// This is a combined plane intersection + radius check, useful for
+    /// picking circular targets (column tops, platforms, etc.).
+    ///
+    /// ```rust,ignore
+    /// let center = Vec3::new(2.0, 3.0, 1.0);
+    /// if let Some(t) = ray.intersect_disk(center, Vec3::Y, 0.5) {
+    ///     let hit = ray.point_at(t);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn intersect_disk(&self, center: Vec3, normal: Vec3, radius: f32) -> Option<f32> {
+        let t = self.intersect_plane(normal, center)?;
+        if t < 0.0 {
+            return None;
+        }
+        let hit = self.point_at(t);
+        let offset = hit - center;
+        if offset.dot(offset) <= radius * radius {
+            Some(t)
+        } else {
+            None
+        }
+    }
+
+    /// Intersect with a sphere defined by center and radius.
+    ///
+    /// Returns the `t` parameter of the **nearest** intersection point
+    /// (forward only, `t >= 0`), or `None` if the ray misses.
+    ///
+    /// ```rust,ignore
+    /// if let Some(t) = ray.intersect_sphere(Vec3::ZERO, 1.0) {
+    ///     let surface_point = ray.point_at(t);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn intersect_sphere(&self, center: Vec3, radius: f32) -> Option<f32> {
+        let oc = self.origin - center;
+        let b = oc.dot(self.direction);
+        let c = oc.dot(oc) - radius * radius;
+        let discriminant = b * b - c;
+        if discriminant < 0.0 {
+            return None;
+        }
+        let sqrt_d = discriminant.sqrt();
+        // Try nearest intersection first
+        let t0 = -b - sqrt_d;
+        if t0 >= 0.0 {
+            return Some(t0);
+        }
+        // Ray origin is inside sphere — use far intersection
+        let t1 = -b + sqrt_d;
+        if t1 >= 0.0 {
+            return Some(t1);
+        }
+        None
+    }
+
     /// Minimum distance from the ray to a line segment `(a, b)`.
     ///
     /// Only considers the forward portion of the ray (`t >= 0`).

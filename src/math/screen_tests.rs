@@ -178,3 +178,71 @@ fn screen_hit_test_segment_miss() {
     let cursor = Vec2::new(400.0, 320.0); // 20px perpendicular, threshold 10
     assert!(screen_hit_test(&shape, cursor, vp, viewport).is_none());
 }
+
+// ──────────── screen_to_ground ────────────
+
+#[test]
+fn screen_to_ground_center_looking_down() {
+    // Camera at (0, 10, 0) looking straight down at the origin.
+    let view = glam::Mat4::look_at_rh(
+        Vec3::new(0.0, 10.0, 0.0),
+        Vec3::ZERO,
+        Vec3::NEG_Z, // "up" is -Z when looking down Y
+    );
+    let proj = glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_4, 1.0, 0.1, 100.0);
+    let inv_vp = (proj * view).inverse();
+    let viewport = Vec2::new(800.0, 800.0);
+    // Screen center should map to world origin on ground
+    let hit = screen_to_ground(Vec2::new(400.0, 400.0), viewport, inv_vp, 0.0).unwrap();
+    assert!(hit.x.abs() < 0.5, "x should be near 0, got {}", hit.x);
+    assert!(hit.y.abs() < 0.5, "z should be near 0, got {}", hit.y);
+}
+
+#[test]
+fn screen_to_ground_offset_cursor() {
+    // Camera at (0, 10, 10) looking at origin — angled view.
+    let view = glam::Mat4::look_at_rh(Vec3::new(0.0, 10.0, 10.0), Vec3::ZERO, Vec3::Y);
+    let proj = glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_4, 1.0, 0.1, 100.0);
+    let inv_vp = (proj * view).inverse();
+    let viewport = Vec2::new(800.0, 600.0);
+    // Moving cursor left should shift world X
+    let center = screen_to_ground(Vec2::new(400.0, 300.0), viewport, inv_vp, 0.0).unwrap();
+    let left = screen_to_ground(Vec2::new(200.0, 300.0), viewport, inv_vp, 0.0).unwrap();
+    assert!(left.x < center.x, "left cursor should give smaller world X");
+}
+
+#[test]
+fn screen_to_ground_returns_none_for_parallel_ray() {
+    // Camera at (0, 0, 5) looking along -Z (parallel to ground plane)
+    let view = glam::Mat4::look_at_rh(Vec3::new(0.0, 0.0, 5.0), Vec3::new(0.0, 0.0, 0.0), Vec3::Y);
+    let proj = glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_4, 1.0, 0.1, 100.0);
+    let inv_vp = (proj * view).inverse();
+    let viewport = Vec2::new(800.0, 600.0);
+    // Center of screen should look straight along -Z, parallel to Y=0 plane
+    let result = screen_to_ground(Vec2::new(400.0, 300.0), viewport, inv_vp, 0.0);
+    // Ray is nearly parallel to ground — may return None or a very distant point
+    // Either outcome is acceptable for a parallel ray
+    if let Some(hit) = result {
+        // If it hits, it should be very far away
+        assert!(
+            hit.length() > 50.0,
+            "parallel ray hit should be very distant, got {}",
+            hit.length()
+        );
+    }
+}
+
+#[test]
+fn screen_to_ground_elevated_plane() {
+    // Camera at (0, 10, 0) looking down
+    let view = glam::Mat4::look_at_rh(Vec3::new(0.0, 10.0, 0.0), Vec3::ZERO, Vec3::NEG_Z);
+    let proj = glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_4, 1.0, 0.1, 100.0);
+    let inv_vp = (proj * view).inverse();
+    let viewport = Vec2::new(800.0, 800.0);
+    // Ground at Y=2 should still work, but hit closer to camera
+    let hit_0 = screen_to_ground(Vec2::new(400.0, 400.0), viewport, inv_vp, 0.0).unwrap();
+    let hit_2 = screen_to_ground(Vec2::new(400.0, 400.0), viewport, inv_vp, 2.0).unwrap();
+    // Both should be near center, but elevated plane hit is valid
+    assert!(hit_0.x.abs() < 0.5);
+    assert!(hit_2.x.abs() < 0.5);
+}

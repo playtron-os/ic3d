@@ -317,6 +317,9 @@ cargo run --example gizmo
 # Custom overlay — scale gizmo built with DraggableOverlay (scene graph)
 cargo run --example gizmo_manual
 
+# Custom shader — iridescent crystal hex columns with energy veins
+cargo run --example crystal
+
 # Advanced — manual Scene3DProgram with debug shader modes (1-6 to switch)
 cargo run --example showcase_advanced --features debug
 ```

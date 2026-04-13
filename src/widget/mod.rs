@@ -26,6 +26,7 @@
 //!             draws: vec![MeshDrawGroup::new(Mesh::cube(1.0), instances)],
 //!             overlays: vec![],
 //!             custom_uniforms: None,
+//!             clear_color: wgpu::Color::BLACK,
 //!         }
 //!     }
 //! }
@@ -73,6 +74,7 @@
 //!                 reveal_radius: 5.0,
 //!                 _pad: [0.0; 3],
 //!             }).to_vec()),
+//!             clear_color: wgpu::Color::BLACK,
 //!         }
 //!     }
 //! }

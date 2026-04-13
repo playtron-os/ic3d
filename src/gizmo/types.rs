@@ -75,6 +75,8 @@ impl GizmoAxis {
 pub enum GizmoResult {
     /// The cursor is hovering over an axis handle (no drag).
     Hover(GizmoAxis),
+    /// The cursor moved off the gizmo after previously hovering.
+    Unhover,
     /// A translation drag produced a world-space delta this frame.
     Translate(Vec3),
 }
