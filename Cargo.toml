@@ -20,7 +20,7 @@ features = ["wgpu", "x11", "wayland", "tokio"]
 
 [dependencies.wgpu]
 git = "https://github.com/playtron-os/wgpu.git"
-rev = "f28c5f92e"
+rev = "1b9a82c33"
 default-features = false
 features = ["std", "wgsl"]
 
