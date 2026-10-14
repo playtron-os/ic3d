@@ -79,7 +79,7 @@ impl ShadowPass {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("ic3d shadow pipeline layout"),
             bind_group_layouts: &[&bind_group_layout],
-            immediate_size: 0,
+            ..Default::default()
         });
 
         // Shader
@@ -152,7 +152,7 @@ impl ShadowPass {
             }),
             timestamp_writes: None,
             occlusion_query_set: None,
-            multiview_mask: None,
+            ..Default::default()
         });
 
         pass.set_viewport(0.0, 0.0, self.size as f32, self.size as f32, 0.0, 1.0);

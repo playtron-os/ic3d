@@ -205,7 +205,7 @@ impl RenderPipeline3D {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("ic3d main pipeline layout"),
             bind_group_layouts: &bind_group_layouts,
-            immediate_size: 0,
+            ..Default::default()
         });
 
         let main_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -279,7 +279,7 @@ impl RenderPipeline3D {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("ic3d overlay pipeline layout"),
                 bind_group_layouts: &[&main_bind_group_layout],
-                immediate_size: 0,
+                ..Default::default()
             });
 
         let overlay_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -584,7 +584,7 @@ impl RenderPipeline3D {
                 }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
-                multiview_mask: None,
+                ..Default::default()
             });
 
             let (x, y, w, h) = clip_bounds;
@@ -703,7 +703,7 @@ impl RenderPipeline3D {
             }),
             timestamp_writes: None,
             occlusion_query_set: None,
-            multiview_mask: None,
+            ..Default::default()
         });
 
         let (x, y, w, h) = clip_bounds;
@@ -819,7 +819,7 @@ impl RenderPipeline3D {
                 }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
-                multiview_mask: None,
+                ..Default::default()
             });
 
             pass.set_viewport(0.0, 0.0, warmup_size as f32, warmup_size as f32, 0.0, 1.0);
