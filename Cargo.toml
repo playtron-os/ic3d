@@ -5,6 +5,18 @@ edition = "2021"
 description = "Lightweight 3D instanced rendering for iced applications"
 license = "GPL-3.0-only"
 repository = "https://github.com/playtron-os/ic3d"
+keywords = ["iced", "3d", "wgpu", "gui", "graphics"]
+categories = ["graphics", "gui", "rendering"]
+include = [
+    "/src",
+    "/shaders",
+    "/examples",
+    "/tests",
+    "/docs/*.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+    "/README.md",
+]
 
 [dependencies]
 glam = "0.29"

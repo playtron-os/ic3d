@@ -5,6 +5,15 @@ Lightweight 3D instanced rendering for [iced](https://iced.rs) applications. Sha
 ![ic3d showcase](docs/example.png)
 ![crystal field](docs/crystals.png)
 
+## Installation
+
+```toml
+[dependencies]
+ic3d = "1"
+```
+
+The crates.io release builds against iced 0.14 and wgpu 27. The `main` branch builds against Playtron's forks of iced and wgpu, so depend on it through git only if your app uses those forks too.
+
 ## Quick Start (Scene Graph)
 
 The simplest path — build a `SceneGraph` with camera, lights, materials, and meshes. It implements `Scene3DProgram` automatically:

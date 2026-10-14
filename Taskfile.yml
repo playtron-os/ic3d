@@ -87,6 +87,32 @@ tasks:
     cmds:
       - cargo tarpaulin --features vulkan --skip-clean --config tarpaulin.toml --out html --output-dir coverage
 
+  crates-io:prepare:
+    desc: Stage the crates.io build (upstream iced and wgpu) in .cache/crates-io
+    cmds:
+      - sh scripts/crates-io.sh
+
+  test:crates-io:
+    desc: Test the crates.io build and dry-run its publish
+    deps:
+      - crates-io:prepare
+    dir: .cache/crates-io
+    env:
+      CARGO_TARGET_DIR: "{{.ROOT_DIR}}/target/crates-io"
+    cmds:
+      - cargo test --features vulkan -- --show-output
+      - cargo publish --dry-run
+
+  crates-io:publish:
+    desc: Publish the crates.io build to crates.io (needs CARGO_REGISTRY_TOKEN)
+    deps:
+      - crates-io:prepare
+    dir: .cache/crates-io
+    env:
+      CARGO_TARGET_DIR: "{{.ROOT_DIR}}/target/crates-io"
+    cmds:
+      - cargo publish
+
   release:
     desc: Publish a new release
     preconditions:
