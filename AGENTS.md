@@ -1,328 +1,99 @@
 # ic3d
 
-## Project Overview
+A small 3D rendering library for iced apps: instanced meshes, a shadow-mapped pipeline with optional post-processing, cameras, lights, a scene graph widget and WGSL shader preludes. Consumers write only a fragment shader.
 
-Lightweight 3D instanced rendering library for iced applications. Provides a shadow-mapped render pipeline with optional post-processing, WGSL shader preludes, camera/light/mesh abstractions, and custom bind group support. Consumers write only a fragment shader.
-
-## Architecture
-
-```
-shaders/*.wgsl  →  include_str!()  →  shaders.rs constants
-                                         ↓
-Consumer: format!("{preludes}\n{my_fragment.wgsl}")
-                                         ↓
-RenderPipeline3D::new(device, format, &shader, config)
-  Pass 1: Shadow depth (light POV → depth texture)
-  Pass 2: Main render (camera POV, samples shadow map, MSAA)
-  Pass 3+: Post-process chain (ping-pong between cached textures)
-```
-
-### Code Organization
-
-One concept per file, grouped by folder (e.g., `camera/`, `light/`). When adding new camera or light types, add a new file in the appropriate folder and re-export from `mod.rs`. Do not merge unrelated types into a single file.
-
-### GPU Bind Groups
-
-- **Group 0 (engine)**:
-  - `binding(0)`: `SceneUniforms` uniform (camera, time, screen, ambient, light count)
-  - `binding(1)`: `array<GpuLight>` storage buffer (up to 16 lights)
-  - `binding(2)`: `shadow_map` depth texture
-  - `binding(3)`: `shadow_sampler` comparison sampler
-- **Group 1 (consumer)**: Optional custom uniforms (e.g., reveal effect)
-
-### Key Types
-
-- `RenderPipeline3D` — Full pipeline: shadow + MSAA + post-process. All fields private; use accessors and `prepare()`/`prepare_scene()`.
-- `PipelineConfig` — Shadow map size, MSAA samples, custom bind group layout.
-- `SceneUniforms` — Camera + screen + time + ambient + light count + shadow map size (matches WGSL exactly).
-- `GpuLight` — Per-light GPU data (128 bytes): shadow projection, direction, color, intensity, position, range, cone angles.
-- `MAX_LIGHTS` — Maximum lights per frame (16).
-- `LIGHT_TYPE_DIRECTIONAL` / `LIGHT_TYPE_POINT` / `LIGHT_TYPE_SPOT` — Light type discriminants.
-- `Vertex` — Per-vertex: position + normal + UV (slot 0).
-- `InstanceData` — Per-instance: model mat4 + normal mat3x3 + material vec4 (128 bytes, slot 1).
-- `DrawCall` — Vertex buffer + instance buffer + ranges for a single draw. Prefer `pipeline.draw()` over manual construction.
-- `Scene` — Builder: camera + lights → `SceneData`. Uses fixed-size `[GpuLight; MAX_LIGHTS]` array internally (no heap allocation per frame).
-- `Camera` trait — `view_matrix()`, `projection_matrix()`, `view_projection()`. Implemented by `OrthographicCamera` and `PerspectiveCamera`.
-- `Light` trait — `fn to_gpu_light(&self) -> GpuLight`. Implemented by `DirectionalLight`, `PointLight`, `SpotLight`.
-- `DirectionalLight` — Direction + color + intensity + shadow projection.
-- `PointLight` — Position + range + color + intensity (omnidirectional).
-- `SpotLight` — Position + direction + inner/outer cone angles + range + color + intensity.
-- `Transform` — TRS → model + normal matrices → `InstanceData`.
-- `Gizmo` — 3D manipulation gizmo for CAD workflows. Translation mode with X/Y/Z axis handles. Produces `MeshDrawGroup`s for rendering and `GizmoResult` events for interaction.
-- `GizmoMode` — Enum: `Translate` (future: `Rotate`, `Scale`).
-- `GizmoAxis` — Enum: `X`, `Y`, `Z`.
-- `GizmoResult` — Enum: `Hover(GizmoAxis)`, `Translate(Vec3)`.
-- `Ray` — Screen-to-world ray casting with plane intersection and line closest-approach.
-- `Mesh` — CPU-side vertex data + primitive builders (cube, sphere, cylinder, cone, torus, plane). Use `mesh.upload(device)` to get a `MeshBuffer`.
-- `MeshBuffer` — Uploaded mesh: GPU vertex buffer + vertex count. Created via `Mesh::upload()`. Use with `pipeline.draw()` for the simplest render path.
-- `DynBuffer` — Auto-growing GPU buffer (2× growth strategy). Private `raw` field; use `.raw()` accessor or `.write()` convenience. Old buffers are retired to a `BufferPool` rather than dropped.
-- `BufferPool` — Frame-delayed buffer recycling. Retired buffers wait 3 frames (GPU pipeline depth) before becoming available for best-fit reuse. `RenderPipeline3D` manages its own pool internally; create a standalone pool only if using `DynBuffer` outside the pipeline.
-- `PostProcessPass` trait — Screen-space effects: `prepare()` + `render()`. Wired into pipeline via `add_post_process()` or widget's `post_process_factory()`.
-- `PostProcessFactory` — Type alias for the factory closure that creates post-process passes at pipeline init time.
-
-### WGSL Preludes (`shaders/`)
-
-| File | Constant | Contents |
-|------|----------|----------|
-| `scene_uniforms.wgsl` | `SCENE_UNIFORMS_WGSL` | `SceneUniforms` + `GpuLight` structs + group 0 bindings (4 entries) |
-| `vertex_io.wgsl` | `VERTEX_IO_WGSL` | `VertexIn` / `VertexOut` structs |
-| `standard_vs.wgsl` | `STANDARD_VS_WGSL` | Standard `vs_main` vertex shader |
-| `shadow_pcf.wgsl` | `SHADOW_PCF_WGSL` | 16-tap rotated Poisson disk PCF shadow sampling |
-| `blinn_phong.wgsl` | `BLINN_PHONG_WGSL` | Default fragment shader: Blinn-Phong + Fresnel + tone mapping |
-| `shadow_pass.wgsl` | `SHADOW_WGSL` (internal) | Shadow depth pass shader |
-
-## Build & Validate
+## Commands
 
 ```bash
-# Using go-task (recommended)
-go-task build            # Build the library
-go-task lint             # fmt check + clippy
-go-task fmt              # Format all code
-go-task test             # Run all tests
-go-task ci               # Full CI pipeline (fmt + clippy + test + build)
-go-task coverage         # Test coverage report (HTML in coverage/)
-
-# Docker builds (for CI)
-go-task docker:build     # Build the CI container image
-go-task docker:run TARGET=ci  # Run full CI checks in Docker
-
-# Using cargo directly
-cargo build
-cargo test
-cargo clippy --all-targets --all-features
-cargo doc --no-deps
+go-task build                     # cargo build for the host target
+go-task lint                      # fmt check + clippy --all-targets --all-features -D warnings
+go-task test                      # unit + GPU tests; GPU tests need Vulkan
+go-task test:unit                 # unit tests only, no GPU needed
+go-task test:gpu                  # GPU integration tests only
+go-task test:one TEST=<name>      # one test, with a backtrace
+go-task coverage                  # cargo-tarpaulin HTML report in coverage/
+go-task ci                        # lint + test + build; CI runs it as docker:run TARGET=ci
+go-task example EXAMPLE=showcase  # run an example, built with the debug feature
 ```
 
-## Dependencies
+Examples: `showcase`, `showcase_advanced` (needs `debug`; keys 1 to 6 switch debug shaders), `gizmo`, `gizmo_manual_draggable`, `gizmo_manual_interactive`, `crystal` and `transparent`.
 
-- **iced** — Playtron fork (`github.com/playtron-os/iced.git`), re-exported as `ic3d::iced`
-- **wgpu** — Playtron fork (`github.com/playtron-os/wgpu.git`), re-exported as `ic3d::wgpu`
-- **glam** 0.29 — Math (re-exported as `ic3d::glam`)
-- **bytemuck** 1.14 — Zero-copy GPU uploads
+## Layout
+
+- `src/pipeline/`: `RenderPipeline3D`, the GPU types, growable buffers, the shadow pass, post-processing and the shader constants.
+- `shaders/*.wgsl`: the WGSL preludes, embedded into `src/pipeline/shaders.rs` with `include_str!`.
+- `src/camera/`, `src/light/`, `src/mesh/` (primitives and SVG paths), `src/math/`: the building blocks.
+- `src/scene/` builds the per-frame `SceneData`. `src/graph/` is the `SceneGraph`. `src/widget/` holds `scene_3d()` and `Scene3DProgram`.
+- `src/gizmo/` and `src/overlay/`: the translation gizmo and the draggable and interactive overlays it is built on.
+- `tests/gpu_*.rs`: GPU integration tests. `tests/gpu_helper.rs` makes a headless Vulkan device.
 
 ## Conventions
 
-- `#[forbid(unsafe_code)]`
-- All public types have doc comments
-- `#[must_use]` on builder methods
-- All struct fields private with accessors — do not expose internal GPU buffers or state
-- WGSL lives in `shaders/*.wgsl`, embedded via `include_str!`
-- Rust types and WGSL structs must stay in sync (byte-for-byte)
-- `glam` is re-exported — consumers use `ic3d::glam` instead of a direct dependency
-- Keep files small and modular: one type/concept per file, grouped by folder (camera/, light/)
-- New camera types → new file in `camera/`, new light types → new file in `light/`
-- Tests live in separate `_tests.rs` files, included via `#[cfg(test)] #[path = "foo_tests.rs"] mod tests;`
+- One type or concept per file, grouped by folder. A new camera goes in `camera/`, a new light in `light/`, re-exported from `mod.rs`. Never merge unrelated types into one file.
+- Struct fields stay private, behind accessors. Never expose internal GPU buffers or state.
+- Every public type has a doc comment.
+- WGSL lives in `shaders/*.wgsl`. A Rust GPU struct and its WGSL twin must match byte for byte.
+- Each source file's unit tests sit in its own `<name>_tests.rs`, pulled in with `#[cfg(test)] #[path = "<name>_tests.rs"] mod tests;`. Never combine several source files' tests in one file.
+- Unlike the shared default, this repo requires tests with every new feature or type, and aims for 80% coverage. `docs/testing.md` says what each kind of change needs.
 
-## Testing
+## Interfaces
 
-### Test Organization
-- **Unit tests** (`src/**/*_tests.rs`): Pure CPU logic — math, transforms, scene building, struct sizes, shader strings. Each source file has its own `_tests.rs` file (e.g., `math.rs` → `math_tests.rs`, `camera/orthographic.rs` → `camera/orthographic_tests.rs`). Do NOT combine tests for multiple source files into one test file.
-- **GPU integration tests** (`tests/gpu_*.rs`): Require a Vulkan device (real GPU locally, lavapipe in CI). Test pipeline creation, buffer operations, shadow pass, custom uniforms, full render cycles. Use `tests/gpu_helper.rs` for device creation.
+- grid-rs (the Grid app's background) uses `compose_shader`, `RenderPipeline3D`, `Mesh` and `MeshBuilder`, `svg::parse_path`, `math` and `ic3d::glam`.
+- The public API is what `lib.rs` re-exports, plus the `gizmo`, `graph`, `math` and `widget` modules. There is no `prelude.rs`.
+- `compose_shader(fragment)` prepends the engine preludes (scene uniforms, vertex IO, standard vertex shader, PCF shadows) to a consumer's fragment shader.
+- Bind group 0 is the engine's: scene uniforms, the lights array (up to `MAX_LIGHTS`, 16), the shadow map and its sampler. Group 1 is the consumer's custom uniforms. Changing a binding or a uniform's layout breaks every consumer shader.
+- `iced` and `wgpu` are Playtron forks, and `glam` 0.29. All three are re-exported (`ic3d::iced`, `ic3d::wgpu`, `ic3d::glam`), so consumers use those instead of their own dependency.
 
-### Coverage Requirements
-- Target **80%+ test coverage** overall. Run `go-task coverage` to check.
-- When adding a new feature or type, **always add corresponding tests**:
-  - Pure logic (builders, math, accessors, conversions) → unit test in `_tests.rs` file
-  - GPU resource creation or buffer operations → GPU integration test in `tests/gpu_*.rs`
-- New camera types → add `camera/<name>_tests.rs` with builder, matrix, and accessor tests
-- New light types → add `light/<name>_tests.rs` with builder, `to_gpu_light()`, and field tests
-- New mesh primitives → add `mesh/<name>_tests.rs` with vertex count and triangle divisibility tests
-- New shader preludes → add assertions in `shaders_tests.rs` (non-empty, contains expected keywords)
-- New GPU types → add size/alignment assertions in `gpu_types_tests.rs`
+## Read before
 
-### Running Tests
-```bash
-go-task test              # All tests (unit + GPU, requires Vulkan)
-go-task test:unit         # Unit tests only (no GPU needed)
-go-task test:gpu          # GPU integration tests only
-go-task coverage          # Coverage report (HTML in coverage/)
-```
+- Before changing the pipeline, a bind group, a GPU type or a WGSL prelude, read `docs/architecture.md`.
+- Before adding a type or its tests, read `docs/testing.md`.
+- Before changing the API apps call (pipeline, `scene_3d`, `SceneGraph`, `Scene3DProgram`), read `docs/consumer-api.md`.
 
-### GPU Test Helper
-GPU integration tests use `tests/gpu_helper.rs` which creates a headless Vulkan device:
-```rust
-#[path = "gpu_helper.rs"]
-mod gpu_helper;
+## Gotchas
 
-#[test]
-fn my_gpu_test() {
-    let (device, queue) = gpu_helper::gpu();
-    // ... test with real GPU device
-}
-```
-In CI, this runs against lavapipe (Mesa software Vulkan renderer) installed in the Docker image.
+- WGSL alignment differs from Rust `#[repr(C)]`: `vec2<f32>` aligns to 8 bytes, `vec3<f32>` to 16, and each `mat3x3<f32>` column takes 16. When adding a uniform struct, check Rust `size_of` against the WGSL. A mismatch corrupts data silently or fails validation at runtime.
+- iced's `shader::Primitive::render()` gets no `device` or `queue`, so create and resize textures in `prepare()`.
+- iced's `Pipeline` trait needs `Send + Sync`, so `Box<dyn PostProcessPass>` must carry those bounds.
+- Without a Vulkan device, the GPU tests panic. Use `go-task test:unit` there. CI uses lavapipe.
 
-## WGSL Alignment (Critical)
+<!-- BEGIN playtron-rules:libs -->
+<!-- Generated by scripts/render-rules.py in playtron-os/kora-packages.
+     Edit the shared rules there, not here. Anything outside these markers is yours. -->
+## Shared rules
 
-WGSL alignment differs from Rust `#[repr(C)]`:
+This repository follows the rules every Playtron repo follows, plus those for `libs` packages. They are identical in every repo in this group, so fix them upstream rather than here.
 
-- `vec2<f32>` → 8-byte alignment (not 4)
-- `vec3<f32>` → 16-byte alignment
-- `mat3x3<f32>` columns → 16 bytes each
+### Every repository
 
-When adding uniform structs, verify Rust `size_of` matches WGSL. Mismatches cause silent data corruption or runtime validation errors.
+- `AGENTS.md` is this repo's instruction file; `CLAUDE.md` and `GEMINI.md` only point at it.
+- Every agent loads `AGENTS.md` on every turn. Keep it under 150 lines and 1,500 words, this block included. Topic detail goes in `docs/`, linked in one line that says when to read it.
+- Never append dated notes, design history or one task's findings to `AGENTS.md`. Add a line only when it changes how the next task must be done.
+- Review policy goes in `REVIEW.md`, not here. No personal machine paths in either.
+- Comment only what the code cannot say, in one or two short sentences. Longer reasoning goes in the pull request.
+- Keep it simple and flat. Early return over nesting. No advanced language features where a plain one works.
+- After changing Rust: `cargo check`, `cargo fmt`, `cargo clippy --fix --allow-dirty`, until clean.
+- Run the repo's own lint and test tasks before calling work done. Never claim a command passed that you did not run.
+- Conventional Commits, `type(scope): subject`. `feat` releases a minor, `fix` and `perf` a patch, other types nothing.
+- A breaking change needs a `BREAKING CHANGE:` footer. `feat!:` does not parse, so it releases nothing.
+- Commit subjects are imperative and under 72 characters. Add a body only for a non-obvious why, in three lines or fewer.
+- Pull requests: Problem, Fix, Testing. 100 words for a small change, 250 at most. No investigation story, no file-by-file walkthrough.
+- Write plain English: short sentences, everyday words, "Kora" not "she", no invented shorthand. The `writing` skill has examples.
+- Never hand-edit a version; semantic-release owns it.
+- Do not add tests unless asked or `REVIEW.md` requires them.
+- Each package is its own repository: depend on a sibling by git URL, never by `path`, symlink or `../` link.
+- A dev deploy to a Kora host must override every `/etc/systemd/user` unit running the system build, with drop-ins naming the same store path.
+- A dev build of an agentos-accounts caller prompts on every credential read until root-owned `allowed-callers.d` names its exact exe.
 
-- `compose_shader(fragment_wgsl)` — Convenience: prepends all engine WGSL preludes to a consumer fragment shader.
+### `libs` packages
 
-## Consumer Integration
+- Public API is a contract. Export public types from `prelude.rs`. `#[must_use]` on builders.
+- Sweep for consumers before changing a public name: `gh search code "<name>" --owner playtron-os`.
+- Unsafe code is forbidden. Clippy `all` + `pedantic`, warnings are errors.
+- WASM-safe: use `utils::platform` abstractions, never `std::time::Instant` directly.
+- No hard-coded visual values. Playtron values are the trait and serde defaults; other brands override.
+- Feature-gate component modules with `#[cfg(feature = "...")]`.
+- Read neighbouring files and match them. Consistency beats individual improvement.
 
-```rust
-// Compose shader — preludes are auto-prepended
-let shader = ic3d::compose_shader(include_str!("my_fragment.wgsl"));
-let pipeline = RenderPipeline3D::new(device, format, &shader, config);
-```
-
-The consumer's `.wgsl` file only needs:
-1. Custom uniform struct + `@group(1)` binding (if needed)
-2. Helper functions (noise, effects, etc.)
-3. `@fragment fn fs_main(in: VertexOut) -> @location(0) vec4<f32>`
-4. Access light data via `lights[0].direction`, `lights[0].color`, etc.
-
-### Pipeline API
-
-```rust
-// Build scene (no heap allocation — fixed-size light array internally)
-let scene_data = Scene::new(&camera)
-    .light(&directional_light)   // accepts any &dyn Light
-    .light(&point_light)
-    .ambient(0.15)
-    .time(elapsed)
-    .screen(width, height)
-    .build();
-
-// Option A: prepare_scene() convenience
-pipeline.prepare_scene(device, queue, bounds, &scene_data, &instances);
-
-// Option B: prepare() with explicit params
-pipeline.prepare(device, queue, bounds, &scene_data.uniforms, &scene_data.lights, &instances);
-
-// Post-processing (register once after creation)
-pipeline.add_post_process(Box::new(MyBloomPass::new()));
-
-// Render — draw() builds DrawCall automatically from MeshBuffer
-let cube = Mesh::cube(1.0).upload(device);
-pipeline.render(encoder, target, bounds, &[
-    pipeline.draw(&cube, 0..instance_count),
-], None);
-```
-
-Call `pipeline.warmup()` after creation to avoid NVIDIA deferred shader compilation stalls.
-
-### iced Constraints
-
-- `shader::Primitive::render()` does NOT provide `device` or `queue` — create/resize textures in `prepare()`, not `render()`
-- `Pipeline` trait requires `Send + Sync` — `Box<dyn PostProcessPass>` must have `Send + Sync` bounds
-
-### Widget API (High-Level)
-
-For most consumers, the **scene graph** is the simplest path — build a `SceneGraph` with camera, lights, materials, and meshes. It implements `Scene3DProgram` directly, so it plugs straight into `scene_3d()`:
-
-```rust
-use ic3d::graph::{SceneGraph, Material, AmbientLight};
-use ic3d::widget::scene_3d;
-use ic3d::{Mesh, PerspectiveCamera, DirectionalLight, SceneHandle};
-use ic3d::glam::Vec3;
-
-let mut graph = SceneGraph::new();
-
-// Materials, camera, lights
-let blue = graph.add_material(Material::new(Vec3::new(0.2, 0.6, 0.9)).with_shininess(64.0));
-let cam_id = graph.add_camera(PerspectiveCamera::new()
-    .position(Vec3::new(5.0, 5.0, 8.0))
-    .target(Vec3::ZERO)
-    .clip(0.1, 50.0));
-graph.add_light(DirectionalLight::new(
-    Vec3::new(-0.5, -1.0, -0.3), Vec3::ZERO, 20.0, 40.0));
-graph.add_light(AmbientLight::new(0.15));
-
-// Meshes with hierarchy
-let body = graph.add_mesh("body", Mesh::cube(1.0)).material(blue)
-    .position(Vec3::new(0.0, 1.0, 0.0)).id();
-let _arm = graph.add_mesh("arm", Mesh::cube(1.0)).material(blue)
-    .parent(body).position(Vec3::new(0.9, 0.3, 0.0)).id();
-
-// In view() — graph implements Scene3DProgram
-let handle = SceneHandle::new();
-scene_3d(graph.clone()).scene(handle.clone()).width(Length::Fill).height(Length::Fill)
-```
-
-Mutate the scene at runtime via `graph.node_mut(id)`, `graph.camera_mut::<PerspectiveCamera>(cam_id)`, and `graph.light_mut::<DirectionalLight>(sun_id)`.
-
-### Widget API (Advanced — Custom Scene3DProgram)
-
-For full control (custom fragment shaders, custom uniforms, manual instance transforms), implement `Scene3DProgram` directly:
-
-```rust
-use ic3d::widget::{scene_3d, Scene3DProgram, Scene3DSetup, MeshDrawGroup};
-
-#[derive(Debug)]
-struct MyScene { time: f32 }
-
-impl Scene3DProgram for MyScene {
-    fn setup(&self, bounds: Rectangle) -> Scene3DSetup {
-        let camera = PerspectiveCamera::new().position(Vec3::new(0.0, 2.0, 5.0));
-        let sun = DirectionalLight::new(Vec3::new(-0.5, -1.0, -0.3), Vec3::ZERO, 15.0, 30.0);
-        let scene = Scene::new(&camera).light(&sun).ambient(0.1).time(self.time).build();
-        Scene3DSetup {
-            scene,
-            draws: vec![MeshDrawGroup::new(Mesh::cube(1.0), vec![instance])],
-            overlays: Vec::new(),
-            custom_uniforms: None,
-        }
-    }
-}
-
-// In view():
-scene_3d(MyScene { time: elapsed }).width(Length::Fill).height(Length::Fill)
-```
-
-**Custom fragment shader**: override `fragment_shader()` to replace the default Blinn-Phong:
-```rust
-fn fragment_shader(&self) -> &str { include_str!("my_effect.wgsl") }
-```
-
-**Custom uniforms** (`@group(1) @binding(0)`): implement `custom_uniforms_size()` and return raw bytes in `setup()`:
-```rust
-impl Scene3DProgram for MyScene {
-    fn custom_uniforms_size(&self) -> usize { std::mem::size_of::<MyUniforms>() }
-    fn setup(&self, bounds: Rectangle) -> Scene3DSetup {
-        Scene3DSetup {
-            // ...
-            custom_uniforms: Some(bytemuck::bytes_of(&my_uniforms).to_vec()),
-        }
-    }
-}
-```
-
-**Post-processing**: return a factory closure from `post_process_factory()`:
-```rust
-fn post_process_factory(&self) -> Option<PostProcessFactory> {
-    Some(Box::new(|device, _queue| {
-        vec![Box::new(MyBloomPass::new(device))]
-    }))
-}
-```
-
-The widget handles buffer creation, bind group layout, uploading, and passing to the render pipeline automatically.
-
-## Examples
-
-```bash
-# Scene graph — all primitives with orbiting camera and 3-point lighting
-cargo run --example showcase
-
-# Translation gizmo — drag axes to move a cube (scene graph)
-cargo run --example gizmo
-
-# Custom overlay — uniform scale gizmo built with DraggableOverlay (single point, pixel deltas)
-cargo run --example gizmo_manual_draggable
-
-# Custom overlay — 3-axis scale gizmo built with InteractiveOverlay (multi-shape, per-axis drag)
-cargo run --example gizmo_manual_interactive
-
-# Custom shader — iridescent crystal hex columns with energy veins
-cargo run --example crystal
-
-# Advanced — manual Scene3DProgram with debug shader modes (1-6 to switch)
-cargo run --example showcase_advanced --features debug
-```
+Full text with the reasoning: [all](https://github.com/playtron-os/kora-packages/blob/main/.agents/skills/architecture/references/rules/all.md), [libs](https://github.com/playtron-os/kora-packages/blob/main/.agents/skills/architecture/references/rules/libs.md). With the `playtron` plugin installed, `/playtron:architecture` has them loaded.
+<!-- END playtron-rules -->
