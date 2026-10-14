@@ -14,6 +14,7 @@ go-task test:one TEST=<name>      # one test, with a backtrace
 go-task coverage                  # cargo-tarpaulin HTML report in coverage/
 go-task ci                        # lint + test + build; CI runs it as docker:run TARGET=ci
 go-task example EXAMPLE=showcase  # run an example, built with the debug feature
+go-task test:crates-io            # test the crates.io build and dry-run its publish
 ```
 
 Examples: `showcase`, `showcase_advanced` (needs `debug`; keys 1 to 6 switch debug shaders), `gizmo`, `gizmo_manual_draggable`, `gizmo_manual_interactive`, `crystal` and `transparent`.
@@ -43,6 +44,7 @@ Examples: `showcase`, `showcase_advanced` (needs `debug`; keys 1 to 6 switch deb
 - `compose_shader(fragment)` prepends the engine preludes (scene uniforms, vertex IO, standard vertex shader, PCF shadows) to a consumer's fragment shader.
 - Bind group 0 is the engine's: scene uniforms, the lights array (up to `MAX_LIGHTS`, 16), the shadow map and its sampler. Group 1 is the consumer's custom uniforms. Changing a binding or a uniform's layout breaks every consumer shader.
 - `iced` and `wgpu` are Playtron forks, and `glam` 0.29. All three are re-exported (`ic3d::iced`, `ic3d::wgpu`, `ic3d::glam`), so consumers use those instead of their own dependency.
+- crates.io rejects git dependencies, so a release publishes a copy that depends on the forks as published on crates.io, `iced-kora` and `wgpu-kora`. `scripts/crates-io.sh` stages it. A fork change ic3d needs must be published as `-kora` first (playtron-os/iced, `kora/README.md`).
 
 ## Read before
 

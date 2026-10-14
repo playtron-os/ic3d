@@ -24,3 +24,16 @@ jobs:
           task docker:run TARGET='ci'
         env:
           SSH_KEY: ${{ secrets.BITBUCKET_SSH_KEY }}
+
+  crates-io:
+    name: Test the crates.io build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Task
+        uses: go-task/setup-task@v1
+      - uses: actions/checkout@v3
+      - run: |
+          task docker:run TARGET='test:crates-io'
+        env:
+          SSH_KEY: ${{ secrets.BITBUCKET_SSH_KEY }}
