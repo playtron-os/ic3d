@@ -1,7 +1,10 @@
 name: 🪲 Test
 
 on:
+  # A branch is tested through its pull request; testing every push too ran it twice.
   push:
+    branches:
+      - main
   pull_request:
 
 concurrency:
