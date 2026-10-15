@@ -5,6 +5,19 @@ Lightweight 3D instanced rendering for [iced](https://iced.rs) applications. Sha
 ![ic3d showcase](docs/example.png)
 ![crystal field](docs/crystals.png)
 
+## Installation
+
+```toml
+[dependencies]
+ic3d = "1"
+```
+
+ic3d builds on Playtron's fork of iced, published as [`iced-kora`](https://crates.io/crates/iced-kora). Your app uses the same iced through `ic3d::iced`, or through its own dependency on the fork:
+
+```toml
+iced = { package = "iced-kora", version = "0.15" }
+```
+
 ## Quick Start (Scene Graph)
 
 The simplest path — build a `SceneGraph` with camera, lights, materials, and meshes. It implements `Scene3DProgram` automatically:
