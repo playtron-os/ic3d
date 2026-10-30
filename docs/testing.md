@@ -38,3 +38,5 @@ fn my_gpu_test() {
 }
 ```
 In CI, this runs against lavapipe (Mesa software Vulkan renderer) installed in the Docker image.
+
+The tests in one binary share a single device. Don't create a device in a test: the CI image's Vulkan loader (1.4.309) crashes when one test destroys its device while another names an object.
