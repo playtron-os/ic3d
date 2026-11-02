@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/playtron-os/ic3d/compare/v1.3.0...v1.4.0) (2026-11-02)
+
+
+### Features
+
+* publish to crates.io against the -kora forks ([14bd884](https://github.com/playtron-os/ic3d/commit/14bd8847f20aaf8fb4cae063d4c6478638b415d9))
+
 # [1.3.0](https://github.com/playtron-os/ic3d/compare/v1.2.0...v1.3.0) (2026-04-13)
 
 
